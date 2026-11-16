@@ -2,12 +2,15 @@ import { NextResponse } from 'next/server';
 import { apiError } from '@/domain/api';
 import { detectPlatform, isHttpUrl } from '@/domain/transcript';
 import { findTranscriptProvider } from '@/services/transcript-providers';
+import { isTranscriptionWorkerConfigured, submitTranscriptionJob, TranscriptionWorkerError } from '@/services/transcription-worker';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
 export async function POST(request: Request) {
   let body: { url?: unknown; language?: unknown };
+  let url = '';
+  let language: string | undefined;
 
   try {
     body = await request.json() as { url?: unknown; language?: unknown };
@@ -16,8 +19,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const url = typeof body.url === 'string' ? body.url.trim() : '';
-    const language = typeof body.language === 'string' ? body.language : undefined;
+    url = typeof body.url === 'string' ? body.url.trim() : '';
+    language = typeof body.language === 'string' ? body.language : undefined;
 
     if (!url || url.length > 2048 || !isHttpUrl(url)) {
       return NextResponse.json(apiError('INVALID_URL', 'URL phải là địa chỉ HTTP hoặc HTTPS hợp lệ.'), { status: 400 });
@@ -26,6 +29,11 @@ export async function POST(request: Request) {
     const platform = detectPlatform(url);
     if (platform === 'unknown') {
       return NextResponse.json(apiError('UNSUPPORTED_PLATFORM', 'Chưa nhận diện được nền tảng từ URL này.'), { status: 422 });
+    }
+
+    if (platform !== 'youtube' && isTranscriptionWorkerConfigured()) {
+      const job = await submitTranscriptionJob(url, language);
+      return NextResponse.json(job, { status: 202 });
     }
 
     const provider = findTranscriptProvider(url);
@@ -37,8 +45,22 @@ export async function POST(request: Request) {
     const document = await provider.getTranscript(url, language);
     return NextResponse.json({ document });
   } catch (error) {
+    if (error instanceof TranscriptionWorkerError) {
+      return NextResponse.json(apiError('UPSTREAM_ERROR', error.status === 401
+        ? 'Worker transcription từ chối xác thực. Hãy kiểm tra token cấu hình.'
+        : 'Worker transcription hiện không khả dụng.'), { status: error.status === 401 ? 502 : 503 });
+    }
     const message = error instanceof Error ? error.message : String(error);
-    if (/NO_TRANSCRIPT|transcript|caption/i.test(message)) {
+    if (error instanceof Error && error.message === 'NO_TRANSCRIPT') {
+      if (isTranscriptionWorkerConfigured()) {
+        try {
+          const job = await submitTranscriptionJob(url, language);
+          return NextResponse.json(job, { status: 202 });
+        } catch {
+          return NextResponse.json(apiError('UPSTREAM_ERROR', 'Không thể khởi động worker transcription lúc này.'), { status: 502 });
+        }
+      }
+
       return NextResponse.json(apiError('TRANSCRIPT_NOT_FOUND', 'Video này không có caption/subtitle khả dụng. MVP chưa chạy speech-to-text từ audio.'), { status: 422 });
     }
 
