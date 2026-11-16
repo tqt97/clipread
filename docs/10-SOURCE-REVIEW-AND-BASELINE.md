@@ -60,6 +60,7 @@ Chưa tách `lib/`, `utils/` hoặc database. Worker đã là một module riên
 - API chưa có rate limit/observability đầy đủ; worker remote có auth nhưng vẫn phù hợp MVP cá nhân, chưa đủ cho public scale.
 - `maxDuration = 30` là cấu hình source, chưa phải bằng chứng deployment thực tế đã nhận đúng cấu hình.
 - Chưa kiểm chứng byte output, caption track thực tế, rate limit YouTube hoặc hành vi production.
+- YouTube provider dùng cache in-memory theo warm instance và không retry mù khi `429`; Vercel vẫn có thể bị giới hạn theo IP datacenter, khi đó cần worker remote.
 - Chưa cài dependency worker hoặc chạy transcript thật trong môi trường này.
 
 ## Thứ tự phát triển được khuyến nghị

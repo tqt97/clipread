@@ -28,6 +28,7 @@ npm run check
 ## Giới hạn
 
 - YouTube có thể giới hạn request hoặc đổi interface nội bộ.
+- Nếu local chạy nhưng Vercel báo YouTube rate limit, đây thường là khác biệt IP datacenter của Vercel. Cấu hình worker remote qua `TRANSCRIPTION_WORKER_URL` và `TRANSCRIPTION_WORKER_TOKEN`; route sẽ fallback sang worker khi YouTube trả rate-limit.
 - Video không có caption được chuyển sang Whisper nếu worker đang chạy.
 - TikTok/Facebook cần worker local/remote đã xác thực.
 - Worker dài, FFmpeg và Whisper phải chạy ngoài request Vercel.

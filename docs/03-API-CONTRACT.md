@@ -55,6 +55,8 @@ Khi có `TRANSCRIPTION_WORKER_URL`, API gửi job sang worker local và trả v�
 
 Client kiểm tra `GET /api/transcript/jobs/{jobId}` cho tới khi `completed` hoặc `failed`. Worker ưu tiên caption; nếu không có caption thì dùng audio + Whisper local.
 
+Nếu YouTube provider trả rate-limit từ Vercel và worker đã cấu hình, API cũng tạo job `202` để worker xử lý bằng IP/runtime riêng. Nếu chưa có worker, API trả `503 UPSTREAM_ERROR` với hướng dẫn cấu hình worker thay vì giả định video không có caption.
+
 Nếu worker chạy remote, Next.js gửi `Authorization: Bearer ...` từ `TRANSCRIPTION_WORKER_TOKEN`; worker yêu cầu token tương ứng trong `WORKER_AUTH_TOKEN`.
 
 | HTTP | Code | Ý nghĩa |
