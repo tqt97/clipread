@@ -8,11 +8,11 @@
 4. Dùng Node.js 22 trở lên.
 5. Deploy.
 
-MVP không cần biến môi trường hay database.
+UI/API MVP không cần database. Nếu bật TikTok/Facebook hoặc Whisper, cần thêm `TRANSCRIPTION_WORKER_URL` và tùy chọn `TRANSCRIPTION_WORKER_TOKEN`; worker phải chạy ngoài request Vercel.
 
 ## Runtime hiện tại
 
-`app/api/transcript/route.ts` dùng Node.js runtime và `maxDuration = 30`. MVP chỉ lấy caption có sẵn; không tải audio và không chạy Whisper.
+`app/api/transcript/route.ts` dùng Node.js runtime và `maxDuration = 30`. YouTube caption chạy trực tiếp; job TikTok/Facebook và fallback Whisper được chuyển sang worker.
 
 ## Trước khi deploy
 
@@ -26,6 +26,6 @@ npm run check
 ## Giới hạn
 
 - YouTube có thể giới hạn request hoặc đổi interface nội bộ.
-- Video không có caption trả lỗi rõ ràng.
-- TikTok/Facebook được nhận diện nhưng chưa có extraction provider.
+- Video không có caption được chuyển sang Whisper nếu worker đang chạy.
+- TikTok/Facebook cần worker local/remote đã xác thực.
 - Worker dài, FFmpeg và Whisper phải chạy ngoài request Vercel.

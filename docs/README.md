@@ -15,6 +15,7 @@
 9. `07-DEVELOPMENT-PLAN.md` — kế hoạch theo milestone
 10. `08-ROADMAP.md` — roadmap rút gọn
 11. `09-RELEASE-CHECKLIST.md` — checklist trước release
+12. `../worker/README.md` — cài đặt worker yt-dlp và Whisper local
 
 ## Quy tắc cập nhật
 

@@ -22,7 +22,7 @@ flowchart LR
     DOC --> E[Projection / Export]
 ```
 
-TikTok và Facebook được nhận diện nhưng chưa có adapter nên kết thúc bằng `PROVIDER_NOT_READY`.
+Khi chưa cấu hình worker, TikTok và Facebook kết thúc bằng `PROVIDER_NOT_READY`. Khi có worker, TikTok/Facebook đi qua `yt-dlp` adapter; YouTube vẫn ưu tiên provider caption hiện tại và chỉ chuyển worker khi thiếu caption. Nếu thiếu caption, worker chuyển sang Whisper local.
 
 ## 3. Ranh giới module
 
@@ -41,6 +41,18 @@ Chứa contract không phụ thuộc Next.js: kiểu document, nhận diện URL
 ### `services/`
 
 Chứa interface provider, registry và adapter kết nối upstream. Adapter biến shape của upstream thành `TranscriptDocument`.
+
+### `worker/`
+
+Worker được tách theo trách nhiệm để không biến HTTP entry point thành một module monolith:
+
+- `server.py`: HTTP endpoint, auth và điều phối job.
+- `job_store.py`: job in-memory, giới hạn queue và TTL cleanup.
+- `captions.py`: chọn caption, tải caption an toàn và chuẩn hóa VTT/SRT/TTML/JSON.
+- `transcriber.py`: subprocess `yt-dlp`/FFmpeg và model Whisper cache theo process.
+- `platforms.py`, `errors.py`: allowlist nền tảng và lỗi nội bộ dùng chung.
+
+Chạy từ root repository bằng `python3 -m worker.server` để các import module hoạt động nhất quán giữa local và test.
 
 ## 4. Vì sao seam provider tồn tại?
 
@@ -80,6 +92,8 @@ Web/API → tạo job → queue → worker → lấy audio tạm
 ```
 
 Worker cần timeout, retry, cancellation, cleanup, giới hạn tài nguyên và idempotency riêng.
+
+Baseline hiện đã có worker tối giản tại `worker/`: job in-memory, một job mỗi lần, `yt-dlp`, FFmpeg và Whisper local. Đây là lựa chọn tiết kiệm chi phí cho máy cá nhân; chưa phải hệ thống production nhiều người dùng.
 
 ## 7. Nguyên tắc không phá kiến trúc
 

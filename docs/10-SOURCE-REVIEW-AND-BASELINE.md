@@ -21,9 +21,9 @@ UI → POST /api/transcript → validate + detect platform
 | Khu vực | Bằng chứng | Kết luận |
 |---|---|---|
 | Entry point | `app/page.tsx` | Trang chính chỉ render `TranscriptWorkbench` |
-| API | `app/api/transcript/route.ts` | Chỉ có `POST /api/transcript`, Node.js runtime, timeout 30 giây |
+| API | `app/api/transcript/route.ts`, `app/api/transcript/jobs/[jobId]/route.ts` | `POST /api/transcript` và `GET /api/transcript/jobs/{jobId}`, Node.js runtime, timeout route tạo job 30 giây |
 | Domain | `domain/transcript.ts` | `TranscriptDocument` là contract chung; segment dùng `offset` và `duration` theo giây |
-| Provider | `services/transcript-provider.ts`, `services/transcript-providers.ts` | Provider có interface nhỏ; registry hiện chỉ đăng ký YouTube |
+| Provider | `services/transcript-provider.ts`, `services/transcript-providers.ts` | Provider trực tiếp hiện đăng ký YouTube; TikTok/Facebook đi qua worker khi bật |
 | Adapter | `services/youtube-transcript-provider.ts` | Adapter gọi `youtube-transcript-plus`, lấy metadata và caption |
 | UI | `components/TranscriptWorkbench.tsx` | UI giữ state request/result/error và gọi exporter domain |
 | Lưu trữ | `app/api/transcript/route.ts` | Không có DB, account, media storage hay server-side persistence |
@@ -46,18 +46,21 @@ app/                         route và giao diện Next.js
 components/                  React client UI
 domain/                      contract, projection, exporter, API error
 services/                    provider interface và adapter cụ thể
+worker/                      runtime Python: job, caption parser, yt-dlp/FFmpeg/Whisper
 docs/                        tài liệu source-of-truth cho team
 ```
 
-Chưa tách `lib/`, `utils/`, database hoặc worker vì chưa có trách nhiệm ổn định cần đặt vào đó. Tạo thêm layer lúc này sẽ làm interface nông hơn và tăng số nơi phải hiểu.
+Chưa tách `lib/`, `utils/` hoặc database. Worker đã là một module riêng vì có runtime, dependency và lifecycle khác với Next.js.
 
 ## Rủi ro còn lại
 
-- Chưa có automated test; đặc biệt cần test hostname, normalization, paragraph grouping và SRT.
-- Error mapping vẫn dựa một phần vào message từ thư viện upstream; nên chuyển sang error type riêng khi provider có thể phân biệt nguyên nhân ổn định.
-- API chưa có rate limit, observability hoặc authentication; phù hợp MVP cá nhân, chưa đủ cho public scale.
+- Worker parser đã có automated test; vẫn chưa có test JS/API integration, browser E2E hoặc fixture URL public ổn định.
+- Worker hiện là MVP local/remote có token tùy chọn, job in-memory, một job mỗi lần và TTL cleanup.
+- Error mapping vẫn dựa một phần vào message từ thư viện upstream/worker; nên chuyển sang error type riêng khi provider có thể phân biệt nguyên nhân ổn định.
+- API chưa có rate limit/observability đầy đủ; worker remote có auth nhưng vẫn phù hợp MVP cá nhân, chưa đủ cho public scale.
 - `maxDuration = 30` là cấu hình source, chưa phải bằng chứng deployment thực tế đã nhận đúng cấu hình.
 - Chưa kiểm chứng byte output, caption track thực tế, rate limit YouTube hoặc hành vi production.
+- Chưa cài dependency worker hoặc chạy transcript thật trong môi trường này.
 
 ## Thứ tự phát triển được khuyến nghị
 
@@ -65,7 +68,7 @@ Chưa tách `lib/`, `utils/`, database hoặc worker vì chưa có trách nhiệ
 2. Tách request validation và error mapping thành module thuần để test không cần Next.js.
 3. Hoàn thiện language discovery dựa trên caption track thật.
 4. Thêm search/highlight và deep-link timestamp trên cùng `TranscriptDocument`.
-5. Chỉ sau khi extraction ổn định mới nghiên cứu AI, worker hoặc persistence.
+5. Tiếp tục kiểm chứng extraction và worker bằng fixture URL ổn định trước khi thêm AI hoặc persistence.
 
 ## Quy tắc giữ kiến trúc
 

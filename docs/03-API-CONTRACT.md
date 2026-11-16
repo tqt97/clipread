@@ -42,6 +42,21 @@
 
 `error` là thông báo hiển thị được cho người dùng; `code` là mã ổn định để UI xử lý. Route hiện không trả raw exception.
 
+### Xử lý qua worker — `202`
+
+Khi có `TRANSCRIPTION_WORKER_URL`, API gửi job sang worker local và trả về ngay:
+
+```json
+{
+  "jobId": "8c6...",
+  "status": "queued"
+}
+```
+
+Client kiểm tra `GET /api/transcript/jobs/{jobId}` cho tới khi `completed` hoặc `failed`. Worker ưu tiên caption; nếu không có caption thì dùng audio + Whisper local.
+
+Nếu worker chạy remote, Next.js gửi `Authorization: Bearer ...` từ `TRANSCRIPTION_WORKER_TOKEN`; worker yêu cầu token tương ứng trong `WORKER_AUTH_TOKEN`.
+
 | HTTP | Code | Ý nghĩa |
 |---:|---|---|
 | 400 | `INVALID_REQUEST` | Body không phải JSON hợp lệ |
@@ -55,5 +70,6 @@
 
 - `offset` và `duration` tính bằng giây, không phải mili-giây.
 - `segments` đã được làm sạch và loại segment có text rỗng.
+- `202` chỉ có nghĩa là job đã được nhận, không phải transcript đã sẵn sàng.
 - API hiện chưa version hóa vì mới là MVP; khi breaking change xuất hiện phải cập nhật client, test và tài liệu cùng lúc.
 - Static review xác nhận shape từ source; chưa có kiểm thử HTTP runtime với upstream thật.

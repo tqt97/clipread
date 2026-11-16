@@ -27,18 +27,18 @@
 - Action items.
 - Translation.
 
-## v0.4 — Transcribe Anything
+## v0.4 — Transcribe Anything (đã có bản local MVP)
 
-- Background jobs.
-- Audio extraction.
+- Background jobs in-memory.
+- Audio extraction local.
 - FFmpeg preprocessing.
-- Whisper/STT fallback.
-- Retry/cancel/cleanup.
+- Whisper local fallback.
+- Retry, dừng polling, cleanup và giới hạn tài nguyên.
 
-## v0.5 — More Sources
+## v0.5 — More Sources (experimental)
 
-- TikTok provider nếu ổn định.
-- Facebook/Reels provider nếu ổn định.
+- TikTok qua worker `yt-dlp`, cần test matrix public URL.
+- Facebook/Reels qua worker `yt-dlp`, cần test matrix public URL.
 
 ## Later — Personal Knowledge Library
 

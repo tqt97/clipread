@@ -60,9 +60,11 @@ Test matrix:
 |---|---|
 | Public video + manual captions | success |
 | Public video + auto captions | success nếu provider hỗ trợ |
-| Video không caption | `TRANSCRIPT_NOT_FOUND` |
+| Video không caption + worker | fallback Whisper |
+| Video không caption, không worker | `TRANSCRIPT_NOT_FOUND` |
 | Invalid URL | `INVALID_URL` |
-| TikTok/Facebook MVP | `PROVIDER_NOT_READY` |
+| TikTok/Facebook, có worker | job `202` rồi `completed`/`failed` |
+| TikTok/Facebook, không worker | `PROVIDER_NOT_READY` |
 
 ## 5. E2E
 
@@ -94,12 +96,8 @@ Không release nếu chưa pass:
 
 ```bash
 npm run typecheck
+npm run test:worker
 npm run build
 ```
 
-Khi đã cài test runner:
-
-```bash
-npm test                 # chưa có script ở baseline hiện tại
-npm run test:e2e         # thêm khi UI ổn định
-```
+E2E browser và test runtime với URL public thật vẫn cần bổ sung khi có fixture ổn định.

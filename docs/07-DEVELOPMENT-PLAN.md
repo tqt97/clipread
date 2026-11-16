@@ -63,7 +63,7 @@ Chứng minh user có thể biến video có caption thành bài đọc nhanh.
 
 ### Cần hoàn thiện trước public beta
 
-- [ ] Unit test URL detection.
+- [x] Unit test worker URL/platform detection.
 - [ ] Unit test exporters.
 - [ ] Unit test paragraph grouping.
 - [ ] Provider integration test matrix.
@@ -134,7 +134,7 @@ AI output không thay thế transcript gốc.
 
 ---
 
-## v0.4 — No-caption Fallback
+## v0.4 — No-caption Fallback (MVP local đã có)
 
 ### Mục tiêu
 
@@ -156,17 +156,17 @@ Web
 
 ### Tasks
 
-- [ ] Job model.
-- [ ] Queue.
-- [ ] Worker deployment.
-- [ ] Audio temp storage.
-- [ ] FFmpeg preprocessing.
-- [ ] Whisper hoặc external STT provider.
-- [ ] Polling/SSE job status.
-- [ ] Cancellation.
-- [ ] Retry policy.
-- [ ] Cleanup.
-- [ ] Resource/cost limits.
+- [x] Job model in-memory.
+- [x] Queue một job chạy và một job chờ.
+- [ ] Worker deployment production.
+- [x] Audio temp storage.
+- [x] FFmpeg preprocessing.
+- [x] Whisper local.
+- [x] Polling job status.
+- [x] Dừng polling phía client.
+- [x] Retry cơ bản từ yt-dlp.
+- [x] Cleanup temp file và TTL job.
+- [x] Giới hạn duration, queue và caption size.
 
 ### Exit criteria
 
@@ -174,21 +174,21 @@ Job failure không làm mất kiểm soát temp file hoặc tài nguyên.
 
 ---
 
-## v0.5 — More Providers
+## v0.5 — More Providers (worker experimental)
 
 ### TikTok
 
-- [ ] Research extraction paths.
+- [x] Research extraction path qua yt-dlp.
 - [ ] Test public URL matrix.
 - [ ] Confirm caption availability behavior.
-- [ ] Implement adapter.
+- [x] Implement worker adapter.
 - [ ] Add regression fixtures.
 
 ### Facebook/Reels
 
-- [ ] Research extraction paths.
+- [x] Research extraction path qua yt-dlp.
 - [ ] Public URL test matrix.
-- [ ] Implement adapter nếu ổn định.
+- [x] Implement worker adapter; vẫn cần test matrix public URL.
 
 ### Release rule
 

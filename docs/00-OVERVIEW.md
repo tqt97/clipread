@@ -24,9 +24,10 @@ Video → Readable Knowledge
 
 ## 2. MVP hiện tại
 
-### Đã hỗ trợ
+### Đã có trong codebase
 
-- YouTube public URL có caption/subtitle.
+- YouTube public URL có caption/subtitle, với fallback worker khi thiếu caption.
+- Pipeline thử nghiệm cho TikTok/Facebook/Reels public URL qua worker `yt-dlp` khi đã cấu hình; chưa có public URL regression matrix.
 - Metadata: title, author, duration, thumbnail khi provider trả về được.
 - Chế độ bài đọc dễ đọc.
 - Chế độ caption giữ timestamp.
@@ -37,25 +38,24 @@ Video → Readable Knowledge
 - Chọn ưu tiên ngôn ngữ: tiếng Việt / tiếng Anh / tiếng Nhật.
 - Không cần account.
 - Không cần database.
-- Không cần API key ở MVP.
+- Không cần API key speech-to-text khi chạy worker local.
 - Deploy được trên Vercel.
 
-### Đã nhận diện nhưng chưa bật provider
+### Phụ thuộc worker local
 
 - TikTok.
 - Facebook / Reels.
 
-Hệ thống phải trả lỗi rõ ràng `PROVIDER_NOT_READY`, không được hiển thị như thể đã hỗ trợ.
+Nếu chưa bật worker, hệ thống trả `PROVIDER_NOT_READY`; khi worker đã bật, hai platform này đi qua job bất đồng bộ.
 
 ### Chưa nằm trong MVP
 
-- Whisper / speech-to-text fallback.
-- Audio download.
+- Whisper / speech-to-text fallback trực tiếp trong Vercel route.
+- Audio download trực tiếp trong Vercel route.
 - AI summary.
 - Saved library/history.
 - Authentication.
-- Background queue.
-- TikTok/Facebook extraction thực tế.
+- Queue bền vững nhiều worker.
 
 ## 3. Nguyên tắc sản phẩm
 
@@ -75,6 +75,7 @@ React
 Node.js runtime
 Vercel
 YouTube transcript provider
+Worker Python: yt-dlp + FFmpeg + Whisper local
 ```
 
 ## 5. Tiêu chí hoàn thành MVP

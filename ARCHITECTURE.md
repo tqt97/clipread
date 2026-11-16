@@ -23,4 +23,4 @@ Các module có trách nhiệm rõ:
 - `domain/`: contract, chuẩn hóa, projection và exporter thuần.
 - `services/`: interface, registry và adapter provider.
 
-Transcript gốc là source of truth. Không thêm database, worker, AI layer hoặc thư mục `utils` cho tới khi có nhu cầu và contract đủ rõ.
+Transcript gốc là source of truth. Worker là module riêng cho yt-dlp/FFmpeg/Whisper; chưa thêm database, AI layer hoặc thư mục `utils` khi chưa có contract đủ rõ.

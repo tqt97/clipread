@@ -74,6 +74,7 @@ Nếu thêm yt-dlp/FFmpeg:
 - file size/time limits;
 - cleanup trong `finally`;
 - worker network egress policy nếu có thể;
+- caption URL phải giữ HTTP(S), cùng host nguồn hoặc thuộc nhóm CDN allowlist; đây là defense-in-depth, không thay thế egress policy ở hạ tầng;
 - validate output path;
 - không cho arbitrary custom args trong public product.
 

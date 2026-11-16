@@ -8,9 +8,9 @@ ClipRead là web app ưu tiên caption: người dùng dán đường dẫn vide
 
 Đã có: URL YouTube công khai có caption, metadata, chế độ bài đọc, chế độ caption kèm timestamp, copy, xuất `.md`/`.txt`/`.srt`, lựa chọn ngôn ngữ Việt/Anh/Nhật. MVP không có tài khoản, cơ sở dữ liệu hay lưu trữ lâu dài.
 
-TikTok và Facebook mới chỉ được nhận diện; API trả `PROVIDER_NOT_READY` cho tới khi có provider ổn định.
+TikTok và Facebook có pipeline thử nghiệm qua worker local khi `TRANSCRIPTION_WORKER_URL` đã cấu hình. Vì chưa có public URL regression matrix, chưa xem đây là production guarantee. Nếu chưa bật worker, API trả `PROVIDER_NOT_READY`.
 
-Chưa có: tải audio, speech-to-text, tóm tắt AI, thư viện lưu trữ và authentication.
+Chưa có: tóm tắt AI, thư viện lưu trữ và authentication. Tải audio và speech-to-text chỉ chạy trong worker local, không chạy trực tiếp trong route Vercel.
 
 ## Cấu trúc chính
 
@@ -20,6 +20,11 @@ Browser → Next.js UI → POST /api/transcript
                     → YouTubeTranscriptProvider
                     → TranscriptDocument
                     → bài đọc / Markdown / TXT / SRT
+
+TikTok/Facebook hoặc YouTube không có caption
+        → POST /jobs → worker/server.py
+        → captions.py → transcriber.py (yt-dlp + FFmpeg + Whisper)
+        → polling trạng thái → TranscriptDocument
 ```
 
 Seam `TranscriptProvider` giúp bổ sung provider sau này mà không làm UI phụ thuộc vào shape riêng của YouTube.
@@ -32,6 +37,26 @@ npm run dev
 ```
 
 Mở `http://localhost:3000`.
+
+## Bật hỗ trợ TikTok/Facebook và video không có caption
+
+Worker local nằm tại [worker/README.md](worker/README.md). Worker dùng `yt-dlp` để lấy caption từ YouTube/TikTok/Facebook và Whisper local làm fallback khi không có caption. Không cần API key speech-to-text.
+
+```bash
+cd worker
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cd ..
+python3 -m worker.server
+```
+
+Ở terminal chạy Next.js. TikTok/Facebook dùng pipeline worker thử nghiệm; YouTube chỉ dùng worker khi không có caption:
+
+```bash
+export TRANSCRIPTION_WORKER_URL=http://127.0.0.1:8787
+npm run dev
+```
 
 ## Kiểm tra
 
