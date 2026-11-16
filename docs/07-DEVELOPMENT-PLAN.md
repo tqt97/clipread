@@ -32,7 +32,7 @@ Chuẩn hóa project để phát triển lâu dài.
 - [x] Platform detection nằm ở domain, không nằm trong API route.
 - [x] Export logic nằm ở domain, UI chỉ gọi hàm export.
 - [ ] Thêm lint/format scripts.
-- [ ] Thiết lập CI: typecheck + test + build.
+- [x] Thiết lập CI: typecheck + test + build.
 - [ ] Thêm `CHANGELOG.md` khi bắt đầu release có version.
 
 ### Exit criteria

@@ -15,6 +15,14 @@ python3 -m worker.server
 
 Mặc định worker chạy tại `http://127.0.0.1:8787`.
 
+Health check:
+
+```bash
+curl http://127.0.0.1:8787/health
+```
+
+Kết quả mong đợi: `{"status": "ok", "service": "clipread-worker"}`.
+
 Trong terminal chạy Next.js:
 
 ```bash

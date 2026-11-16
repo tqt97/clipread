@@ -34,7 +34,9 @@
 
 ## Deployment
 
+- [ ] GitHub Actions CI pass trên commit release.
 - [ ] Vercel build pass.
+- [ ] Chọn đúng một cơ chế production deploy: Vercel Git Integration hoặc GitHub Actions.
 - [ ] production URL smoke test.
 - [ ] error monitoring hoạt động.
 - [ ] changelog cập nhật.

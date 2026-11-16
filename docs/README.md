@@ -16,6 +16,7 @@
 10. `08-ROADMAP.md` — roadmap rút gọn
 11. `09-RELEASE-CHECKLIST.md` — checklist trước release
 12. `../worker/README.md` — cài đặt worker yt-dlp và Whisper local
+13. `11-CI-CD-AND-DEPLOYMENT.md` — GitHub Actions, Vercel và triển khai worker
 
 ## Quy tắc cập nhật
 

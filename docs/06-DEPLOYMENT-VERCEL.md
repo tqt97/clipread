@@ -23,7 +23,7 @@ GitHub repository
 → Deploy
 ```
 
-MVP không cần database hoặc environment variable.
+YouTube caption-only không cần environment variable. Nếu bật worker cho TikTok/Facebook hoặc Whisper fallback, cần `TRANSCRIPTION_WORKER_URL` và `TRANSCRIPTION_WORKER_TOKEN` trên Vercel.
 
 ## 4. Before deploy
 
@@ -61,3 +61,5 @@ Không nên chạy trực tiếp trong request thông thường:
 - job cần cancellation/retry phức tạp.
 
 Các tác vụ này chuyển sang worker/job architecture.
+
+CI/CD đầy đủ xem [docs/11-CI-CD-AND-DEPLOYMENT.md](11-CI-CD-AND-DEPLOYMENT.md).

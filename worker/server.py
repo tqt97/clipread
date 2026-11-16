@@ -142,6 +142,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"error": str(error), "code": error.code}, 400 if error.code != "QUEUE_FULL" else 429)
 
     def do_GET(self):
+        if self.path == "/health":
+            self.send_json({"status": "ok", "service": "clipread-worker"})
+            return
         if not self.authorized():
             self.send_json({"error": "Worker authentication required.", "code": "UNAUTHORIZED"}, 401)
             return

@@ -61,13 +61,14 @@ npm run dev
 ## Kiểm tra
 
 ```bash
-npm run typecheck
-npm run build
+npm run check
 ```
 
 ## Triển khai
 
-Vercel tự nhận diện Next.js. Node.js tối thiểu là 22; MVP không cần biến môi trường hay cơ sở dữ liệu. Route transcript chạy Node.js runtime với giới hạn 30 giây.
+Vercel tự nhận diện Next.js. Node.js tối thiểu là 22; YouTube caption-only không cần database hoặc environment variable. Nếu bật worker, cần cấu hình `TRANSCRIPTION_WORKER_URL` và `TRANSCRIPTION_WORKER_TOKEN` trên Vercel. Route transcript chạy Node.js runtime với giới hạn 30 giây.
+
+Xem hướng dẫn CI/CD và deploy đầy đủ tại [docs/11-CI-CD-AND-DEPLOYMENT.md](docs/11-CI-CD-AND-DEPLOYMENT.md).
 
 ## Giới hạn cần biết
 
