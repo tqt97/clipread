@@ -379,14 +379,13 @@ export const TranscriptWorkbench = () => {
     <main className="shell">
       <header className="topbar">
         <div className="brand"><span>CR</span><strong>ClipRead</strong></div>
-        <div className="status"><i /> MVP ưu tiên phụ đề</div>
       </header>
 
       <section className="hero">
         <div className="hero-copy">
-          <span className="kicker"><Sparkles size={14} /> video → tri thức có thể đọc</span>
-          <h1>Đừng xem hết.<br/><em>Đọc phần đáng giá.</em></h1>
-          <p>Paste một video link. ClipRead lấy caption có sẵn, làm sạch thành bài đọc và cho bạn xuất Markdown, TXT hoặc SRT.</p>
+          <span className="kicker"><Sparkles size={14} /> video thành bản đọc</span>
+          <h1>Xem ít hơn. <em>Nắm nhiều hơn.</em></h1>
+          <p>Dán link video để biến phụ đề thành bản đọc dễ theo dõi. Tìm nhanh ý quan trọng, xem lại theo mốc thời gian và xuất thành Markdown, TXT hoặc SRT.</p>
         </div>
 
         <div className="input-card">
