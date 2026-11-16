@@ -2,6 +2,31 @@
 
 Tài liệu này mô tả đường đi từ commit đến production, gồm Next.js trên Vercel và worker Python chạy ngoài Vercel.
 
+Project production hiện tại: [https://clipread-five.vercel.app/](https://clipread-five.vercel.app/).
+
+## 0. Trường hợp của project `clipread-five`
+
+Nếu giao diện nhận diện TikTok nhưng báo `provider transcript chưa được bật trong MVP`, Vercel chưa có biến `TRANSCRIPTION_WORKER_URL` trong environment đang deploy. Nếu YouTube local chạy nhưng Vercel lỗi, Vercel có thể đang bị YouTube giới hạn theo IP máy chủ. Hai vấn đề đều được xử lý bằng cách cấu hình worker remote.
+
+### Environment variables bắt buộc trên Vercel
+
+Vào `Vercel → clipread-five → Settings → Environment Variables`, thêm chính xác:
+
+```text
+TRANSCRIPTION_WORKER_URL=https://<worker-domain>
+TRANSCRIPTION_WORKER_TOKEN=<random-secret>
+```
+
+Chọn `Production`. Nếu muốn test Preview Deployment, thêm cùng biến cho `Preview`.
+
+Worker phải có:
+
+```text
+WORKER_AUTH_TOKEN=<cùng random-secret>
+```
+
+`TRANSCRIPTION_WORKER_URL` không được là `localhost`, `127.0.0.1` hoặc URL HTTP không public. Sau khi lưu environment variables, chọn `Redeploy` deployment production; Vercel không tự áp dụng biến mới cho deployment cũ.
+
 ## 1. Kiến trúc deploy
 
 ```text
@@ -126,6 +151,67 @@ TRANSCRIPTION_WORKER_TOKEN=<cùng giá trị WORKER_AUTH_TOKEN>
 Chỉ thêm vào `Production` hoặc các environment cần dùng. Không dùng URL `localhost`/`127.0.0.1` trong Vercel.
 
 Sau khi đổi environment variable, tạo deployment mới để runtime nhận giá trị mới.
+
+## 5.1. Cấu hình tiết kiệm nhất: worker trên máy cá nhân + Cloudflare Tunnel
+
+Phù hợp để thử nghiệm với chi phí thấp. Máy cá nhân phải bật, có mạng và không được sleep trong lúc worker xử lý.
+
+Terminal 1 — chạy worker từ repository root:
+
+```bash
+source worker/.venv/bin/activate
+export HOST=127.0.0.1
+export PORT=8787
+export WORKER_AUTH_TOKEN='random-secret-dai'
+python3 -m worker.server
+```
+
+Terminal 2 — expose HTTPS tạm thời:
+
+```bash
+cloudflared tunnel --url http://127.0.0.1:8787
+```
+
+Cloudflare sẽ in ra một URL HTTPS dạng `https://<random>.trycloudflare.com`. Dùng URL đó làm `TRANSCRIPTION_WORKER_URL` trên Vercel, cùng token ở hai phía. Kiểm tra:
+
+```bash
+curl https://<random>.trycloudflare.com/health
+```
+
+Quick Tunnel có URL thay đổi và phù hợp test, không phù hợp production lâu dài. Muốn URL cố định, tạo named tunnel và chạy cloudflared như một service trên máy hoặc VPS.
+
+## 5.2. Cấu hình ổn định: worker trên VPS/managed host
+
+1. Tạo máy/host có Python, FFmpeg và đủ disk/RAM cho Whisper.
+2. Clone repository.
+3. Cài worker theo [worker/README.md](../worker/README.md).
+4. Chạy worker bind trong private network hoặc `0.0.0.0` phía sau HTTPS reverse proxy.
+5. Đặt `WORKER_AUTH_TOKEN` trên host, không commit vào repository.
+6. Mở firewall chỉ cho traffic cần thiết.
+7. Trỏ `TRANSCRIPTION_WORKER_URL` tới domain HTTPS của worker.
+8. Kiểm tra `/health`, sau đó test TikTok và YouTube từ production.
+
+Worker hiện là in-memory MVP: restart mất job, chỉ chạy một job đồng thời và chưa có auto-scale. Không mở public traffic lớn trước khi thêm queue bền vững, rate limit và monitoring.
+
+## 5.3. Checklist kiểm tra đúng environment
+
+Trên Vercel, mở `Deployments → deployment production → Functions → Logs`, gửi một request mới rồi kiểm tra:
+
+- TikTok/Facebook trả `202`, không còn `PROVIDER_NOT_READY`;
+- YouTube có caption trả `200`;
+- YouTube bị rate-limit sẽ trả `202` nếu worker đã cấu hình;
+- worker nhận `Authorization: Bearer ...`;
+- không log token trong Vercel hoặc worker.
+
+Request test TikTok:
+
+```bash
+curl -i -X POST https://clipread-five.vercel.app/api/transcript \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://www.tiktok.com/@demo/video/1234567890123456789","language":"auto"}'
+```
+
+URL ví dụ có thể không tồn tại; mục tiêu của test này là kiểm tra route có trả `PROVIDER_NOT_READY` hay đã trả `202`/lỗi upstream từ worker.
 
 ## 6. Triển khai worker
 

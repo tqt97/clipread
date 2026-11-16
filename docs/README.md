@@ -17,6 +17,7 @@
 11. `09-RELEASE-CHECKLIST.md` — checklist trước release
 12. `../worker/README.md` — cài đặt worker yt-dlp và Whisper local
 13. `11-CI-CD-AND-DEPLOYMENT.md` — GitHub Actions, Vercel và triển khai worker
+14. `../.env.example` — tên environment variables cần cho worker integration
 
 ## Quy tắc cập nhật
 

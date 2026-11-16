@@ -58,6 +58,8 @@ export TRANSCRIPTION_WORKER_URL=http://127.0.0.1:8787
 npm run dev
 ```
 
+Khi deploy tại `https://clipread-five.vercel.app/`, không dùng URL local ở trên. Xem [hướng dẫn cấu hình Vercel và worker](docs/11-CI-CD-AND-DEPLOYMENT.md#0-trường-hợp-của-project-clipread-five).
+
 ## Kiểm tra
 
 ```bash
