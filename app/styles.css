@@ -135,14 +135,15 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .reader-toolbar button { min-height: 34px; border: 1px solid transparent; background: transparent; color: #777266; display: inline-flex; align-items: center; gap: 5px; padding: 0 9px; font: 700 10px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 .view-switch button.active { color: var(--green); background: var(--soft-green); border-color: #c6d5cc; }
 .export-actions button { border-color: var(--line); background: #fffef9; }
-.reader-body { padding: clamp(26px, 4vw, 58px); max-height: 780px; overflow: auto; }
-.reader-body > p { margin: 0 0 1.3em; font-size: clamp(17px, 1.6vw, 20px); line-height: 1.8; color: #2d302b; }
+.reader-body { padding: clamp(26px, 4vw, 58px); max-height: 780px; overflow: auto; overscroll-behavior: contain; }
+.reader-body > p { margin: 0 0 1.3em; font-size: clamp(17px, 1.6vw, 20px); line-height: 1.8; color: #2d302b; text-wrap: pretty; content-visibility: auto; contain-intrinsic-size: auto 150px; }
 .reader-body > p:first-child::first-letter { float: left; color: var(--accent); font-size: 58px; line-height: .8; padding: 8px 8px 0 0; }
-.caption-row { display: grid; grid-template-columns: 70px 1fr; gap: 16px; padding: 10px 0; border-bottom: 1px solid #eee8dc; scroll-margin: 18px; transition: background .2s ease; }
+.caption-row { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 16px; padding: 10px 0; border-bottom: 1px solid #eee8dc; scroll-margin: 18px; transition: background .2s ease; content-visibility: auto; contain-intrinsic-size: auto 58px; }
 .caption-row.active { margin-inline: -10px; padding-inline: 10px; border-radius: 3px; background: #fff3ed; }
 .caption-row > a { display: inline-flex; align-items: flex-start; gap: 3px; color: var(--accent); padding-top: 3px; font: 10px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-decoration: none; }
 .caption-row > a:hover { text-decoration: underline; }
 .caption-row span { line-height: 1.55; }
+.caption-row > span { text-wrap: pretty; }
 .caption-row mark { border-radius: 2px; background: #f7d88b; color: inherit; padding: 0 2px; }
 footer { display: flex; justify-content: space-between; gap: 18px; border-top: 1px solid var(--line); padding-top: 18px; color: #898376; font: 10px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 @media (hover: none) { .caption-tools { opacity: 1; } }

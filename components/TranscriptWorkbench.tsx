@@ -146,7 +146,8 @@ export const TranscriptWorkbench = () => {
   const actionItems = useMemo(() => document ? extractActionItems(document.segments) : [], [document]);
   const answer = useMemo(() => document ? answerTranscriptQuestion(document.segments, question) : { confidence: 'low' as const, results: [] }, [document, question]);
   const searchResults = useMemo(() => document ? searchTranscript(document.segments, searchQuery) : [], [document, searchQuery]);
-  const wordCount = useMemo(() => paragraphs.join(' ').split(/\s+/).filter(Boolean).length, [paragraphs]);
+  const matchingSegmentIds = useMemo(() => new Set(searchResults.map((result) => result.segmentId)), [searchResults]);
+  const wordCount = useMemo(() => paragraphs.reduce((count, paragraph) => count + (paragraph.match(/\S+/g)?.length || 0), 0), [paragraphs]);
   const readingMinutes = Math.max(1, Math.ceil(wordCount / 220));
 
   useEffect(() => {
@@ -575,7 +576,7 @@ export const TranscriptWorkbench = () => {
                   >
                     {formatTimestamp(segment.offset)} <ExternalLink size={11} />
                   </a>
-                  <span>{renderSearchText(segment.text, searchQuery)}</span>
+                  <span>{matchingSegmentIds.has(index) ? renderSearchText(segment.text, searchQuery) : segment.text}</span>
                   <div className="caption-tools">
                     <button type="button" onClick={() => toggleBookmark(index)} aria-label={bookmarkedSegments.includes(index) ? 'Bỏ bookmark' : 'Đánh dấu bookmark'} title={bookmarkedSegments.includes(index) ? 'Bỏ bookmark' : 'Bookmark'}>{bookmarkedSegments.includes(index) ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}</button>
                     <button type="button" onClick={() => { setActiveSegmentId(index); setNoteDraft(notes[index] || ''); }} aria-label="Thêm ghi chú" title="Ghi chú"><StickyNote size={14} /></button>
