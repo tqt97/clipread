@@ -3,6 +3,7 @@
 ## Code quality
 
 - [ ] `npm run typecheck` pass.
+- [ ] `npm run test:domain` pass.
 - [ ] `npm run build` pass.
 - [ ] `npm run test:worker` pass.
 - [ ] không còn debug logs không cần thiết.

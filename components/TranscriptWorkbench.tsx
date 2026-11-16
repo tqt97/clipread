@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type UIEvent } from 'react';
-import { BookOpenText, Check, Clipboard, Download, FileText, Link2, LoaderCircle, Sparkles, Subtitles, Text } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ReactNode, type UIEvent } from 'react';
+import { BookOpenText, Check, ChevronLeft, ChevronRight, Clipboard, Download, ExternalLink, FileText, Link2, LoaderCircle, Search, Sparkles, Subtitles, Text } from 'lucide-react';
 import type { TranscriptDocument } from '@/domain/transcript';
 import { normalizeTranscriptionJobStage, type TranscriptionJobResponse, type TranscriptionJobStage } from '@/domain/transcription-job';
 import { detectPlatform, toMarkdown, toPlainText, toReadableParagraphs, toSrt } from '@/domain/transcript';
+import { extractTranscriptInsights, normalizeSearchText, searchTranscript, toTimestampUrl } from '@/domain/insights';
 
 type ViewMode = 'read' | 'raw';
 const POLL_TIMEOUT_MS = 15 * 60 * 1000;
@@ -58,6 +59,38 @@ const slug = (value: string): string => value
   .replace(/^-+|-+$/g, '')
   .slice(0, 72) || 'clipread-transcript';
 
+const formatTimestamp = (seconds: number): string => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
+
+const renderSearchText = (text: string, query: string) => {
+  const normalizedQuery = normalizeSearchText(query.trim());
+  if (!normalizedQuery) return text;
+
+  const ranges: Array<[number, number]> = [];
+  for (let start = 0; start < text.length; start += 1) {
+    let normalizedCandidate = '';
+    for (let end = start; end < text.length; end += 1) {
+      normalizedCandidate = normalizeSearchText(text.slice(start, end + 1));
+      if (normalizedCandidate === normalizedQuery) {
+        ranges.push([start, end + 1]);
+        break;
+      }
+      if (normalizedCandidate.length > normalizedQuery.length || !normalizedQuery.startsWith(normalizedCandidate)) break;
+    }
+  }
+  if (ranges.length === 0) return text;
+
+  const parts: ReactNode[] = [];
+  let cursor = 0;
+  ranges.forEach(([start, end], index) => {
+    if (start < cursor) return;
+    if (start > cursor) parts.push(text.slice(cursor, start));
+    parts.push(<mark key={`${start}-${end}-${index}`}>{text.slice(start, end)}</mark>);
+    cursor = end;
+  });
+  if (cursor < text.length) parts.push(text.slice(cursor));
+  return parts;
+};
+
 export const TranscriptWorkbench = () => {
   const [url, setUrl] = useState('');
   const [language, setLanguage] = useState('auto');
@@ -74,11 +107,50 @@ export const TranscriptWorkbench = () => {
   const pollingCancelledRef = useRef(false);
   const [copied, setCopied] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('read');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeSearchIndex, setActiveSearchIndex] = useState(0);
+  const [activeSegmentId, setActiveSegmentId] = useState<number | null>(null);
+  const segmentRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   const platform = useMemo(() => detectPlatform(url), [url]);
   const paragraphs = useMemo(() => document ? toReadableParagraphs(document.segments) : [], [document]);
+  const insights = useMemo(() => document ? extractTranscriptInsights(document.segments) : { keywords: [], highlights: [] }, [document]);
+  const searchResults = useMemo(() => document ? searchTranscript(document.segments, searchQuery) : [], [document, searchQuery]);
   const wordCount = useMemo(() => paragraphs.join(' ').split(/\s+/).filter(Boolean).length, [paragraphs]);
   const readingMinutes = Math.max(1, Math.ceil(wordCount / 220));
+
+  useEffect(() => {
+    setActiveSearchIndex(0);
+    if (searchQuery.trim() && searchResults.length > 0) {
+      setViewMode('raw');
+      setActiveSegmentId(searchResults[0].segmentId);
+    }
+  }, [searchQuery, searchResults]);
+
+  useEffect(() => {
+    if (!document) return;
+    const syncHash = () => {
+      const match = window.location.hash.match(/^#segment-(\d+)$/);
+      const segmentId = match ? Number(match[1]) : null;
+      if (segmentId === null || segmentId < 0 || segmentId >= document.segments.length) {
+        setActiveSegmentId(null);
+        return;
+      }
+      setViewMode('raw');
+      setActiveSegmentId(segmentId);
+    };
+    syncHash();
+    window.addEventListener('hashchange', syncHash);
+    return () => window.removeEventListener('hashchange', syncHash);
+  }, [document]);
+
+  useEffect(() => {
+    if (viewMode !== 'raw' || activeSegmentId === null) return;
+    const frame = window.requestAnimationFrame(() => {
+      segmentRefs.current[activeSegmentId]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeSegmentId, viewMode]);
 
   useEffect(() => {
     if (!loading) {
@@ -118,6 +190,19 @@ export const TranscriptWorkbench = () => {
       readingProgressRef.current = nextProgress;
       setReadingProgress(nextProgress);
     }
+  };
+
+  const scrollToSegment = (segmentId: number) => {
+    setViewMode('raw');
+    setActiveSegmentId(segmentId);
+    window.history.replaceState(null, '', `#segment-${segmentId}`);
+  };
+
+  const moveSearch = (direction: 1 | -1) => {
+    if (searchResults.length === 0) return;
+    const nextIndex = (activeSearchIndex + direction + searchResults.length) % searchResults.length;
+    setActiveSearchIndex(nextIndex);
+    scrollToSegment(searchResults[nextIndex].segmentId);
   };
 
   const extract = async () => {
@@ -276,6 +361,46 @@ export const TranscriptWorkbench = () => {
               <div><dt>Thời gian đọc</dt><dd>~{readingMinutes} phút</dd></div>
               <div><dt>Đoạn caption</dt><dd>{document.segments.length}</dd></div>
             </dl>
+            {(insights.highlights.length > 0 || insights.keywords.length > 0) && (
+              <section className="insights-card" aria-label="Điểm đáng chú ý">
+                <div className="insights-heading">
+                  <strong>Điểm đáng chú ý</strong>
+                  <small>Không dùng AI</small>
+                </div>
+                {insights.highlights.length > 0 && (
+                  <ol className="highlight-list">
+                    {insights.highlights.map((highlight) => (
+                      <li key={highlight.segmentId}>
+                        <button type="button" onClick={() => scrollToSegment(highlight.segmentId)}>
+                          <span>{highlight.text}</span>
+                          <time>{formatTimestamp(highlight.offset)}</time>
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {insights.keywords.length > 0 && (
+                  <div className="keyword-section">
+                    <span className="keyword-title">Keywords</span>
+                    <div className="keyword-list">
+                      {insights.keywords.map((keyword) => (
+                        <button
+                          type="button"
+                          className="keyword-chip"
+                          key={keyword.term}
+                          onClick={() => {
+                            setSearchQuery(keyword.term);
+                            scrollToSegment(keyword.segmentIds[0]);
+                          }}
+                        >
+                          {keyword.term}<small>{keyword.count}</small>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
           </aside>
 
           <article className="reader-card">
@@ -295,12 +420,44 @@ export const TranscriptWorkbench = () => {
                 <button onClick={() => downloadText(toSrt(document.segments), `${base}.srt`, 'application/x-subrip')}><Download size={15}/> Phụ đề</button>
               </div>
             </div>
+            <div className="transcript-search" role="search">
+              <Search size={16} aria-hidden="true" />
+              <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') moveSearch(event.shiftKey ? -1 : 1);
+                }}
+                placeholder="Tìm trong transcript..."
+                aria-label="Tìm trong transcript"
+              />
+              <span>{searchQuery.trim() ? `${searchResults.length} kết quả` : 'Tìm kiếm'}</span>
+              <button type="button" onClick={() => moveSearch(-1)} disabled={searchResults.length === 0} aria-label="Kết quả trước">
+                <ChevronLeft size={15} />
+              </button>
+              <button type="button" onClick={() => moveSearch(1)} disabled={searchResults.length === 0} aria-label="Kết quả tiếp theo">
+                <ChevronRight size={15} />
+              </button>
+            </div>
 
             <div className="reader-body" ref={readerBodyRef} onScroll={handleReaderScroll}>
-              {viewMode === 'read' ? paragraphs.map((paragraph, index) => <p key={`${index}-${paragraph.slice(0, 20)}`}>{paragraph}</p>) : document.segments.map((segment) => (
-                <div className="caption-row" key={`${segment.offset}-${segment.text.slice(0, 20)}`}>
-                  <time>{Math.floor(segment.offset / 60)}:{String(Math.floor(segment.offset % 60)).padStart(2, '0')}</time>
-                  <span>{segment.text}</span>
+              {viewMode === 'read' ? paragraphs.map((paragraph, index) => <p key={`${index}-${paragraph.slice(0, 20)}`}>{paragraph}</p>) : document.segments.map((segment, index) => (
+                <div
+                  className={`caption-row ${activeSegmentId === index ? 'active' : ''}`}
+                  id={`segment-${index}`}
+                  key={`${segment.offset}-${segment.text.slice(0, 20)}`}
+                  ref={(element) => { segmentRefs.current[index] = element; }}
+                >
+                  <a
+                    href={toTimestampUrl(document.sourceUrl, segment.offset)}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => scrollToSegment(index)}
+                    aria-label={`Mở video tại ${formatTimestamp(segment.offset)}`}
+                  >
+                    {formatTimestamp(segment.offset)} <ExternalLink size={11} />
+                  </a>
+                  <span>{renderSearchText(segment.text, searchQuery)}</span>
                 </div>
               ))}
             </div>

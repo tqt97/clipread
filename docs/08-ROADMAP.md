@@ -13,7 +13,7 @@
 ## v0.2 — Read Better
 
 - Transcript search.
-- Highlight.
+- Deterministic keywords và highlights có timestamp.
 - Timestamp deep-link.
 - Real caption language discovery.
 - Better paragraph segmentation.

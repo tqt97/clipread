@@ -63,8 +63,9 @@ npm run check
 `npm run check` gồm:
 
 1. `npm run typecheck`;
-2. `npm run test:worker`;
-3. `npm run build`.
+2. `npm run test:domain`;
+3. `npm run test:worker`;
+4. `npm run build`.
 
 Không cài `worker/requirements.txt` trong CI mặc định vì test worker hiện là parser/job-store test và không cần tải Whisper model nặng. Khi thêm integration test gọi `yt-dlp`/Whisper, tạo workflow riêng có fixture và timeout rõ ràng.
 

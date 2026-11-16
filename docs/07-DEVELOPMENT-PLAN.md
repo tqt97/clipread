@@ -80,9 +80,11 @@ Biến transcript từ “text dump” thành trải nghiệm đọc có giá tr
 
 ### P0
 
-- [ ] Search trong transcript.
-- [ ] Highlight kết quả.
-- [ ] Click timestamp mở video đúng vị trí.
+- [x] Search trong transcript.
+- [x] Highlight kết quả tìm kiếm và điểm đáng chú ý deterministic.
+- [x] Click timestamp mở video đúng vị trí.
+- [x] Keyword extraction không dùng API trả phí.
+- [x] Click keyword → scroll đến segment liên quan.
 - [ ] Discover caption languages thực tế.
 - [ ] Better paragraph segmentation.
 

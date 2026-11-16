@@ -36,6 +36,15 @@ Test:
 - SRT numbering/timestamps.
 - Unicode Vietnamese/Japanese.
 
+### Transcript insights
+
+Test tại domain seam `domain/insights.ts`:
+
+- search không phân biệt hoa thường và trả đúng segment/timestamp;
+- keyword ranking deterministic, loại stop words và không mutate transcript;
+- highlights có thể truy về segment nguồn;
+- YouTube timestamp URL thêm `t`, platform khác giữ nguyên URL.
+
 ## 3. Provider contract tests
 
 Mỗi provider phải qua cùng test contract:
@@ -96,6 +105,7 @@ Không release nếu chưa pass:
 
 ```bash
 npm run typecheck
+npm run test:domain
 npm run test:worker
 npm run build
 ```
