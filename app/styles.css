@@ -56,6 +56,20 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .flow b { color: var(--accent); }
 .error-panel { max-width: 760px; margin: 0 auto 42px; border-left: 4px solid var(--accent); background: #fff4ee; padding: 18px 20px; }
 .error-panel strong { font-size: 14px; }.error-panel p { margin: 6px 0 0; color: #7a5e50; line-height: 1.5; }
+.progress-panel { max-width: 760px; margin: 0 auto 42px; padding: 18px 20px; border: 1px solid #c6d5cc; background: rgba(255,253,247,.94); box-shadow: 0 10px 30px rgba(71,64,51,.06); }
+.progress-heading { display: flex; align-items: center; gap: 12px; }
+.progress-icon { display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 38px; border-radius: 50%; color: var(--green); background: var(--soft-green); }
+.progress-heading strong { display: block; font-size: 14px; }
+.progress-heading p { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.progress-count { margin-left: auto; white-space: nowrap; color: var(--green); font: 700 10px ui-monospace, monospace; }
+.progress-track { height: 7px; margin-top: 18px; overflow: hidden; border-radius: 99px; background: #e8e5db; }
+.progress-track span { display: block; height: 100%; border-radius: inherit; background: var(--green); transition: width .35s ease; }
+.progress-fill-active { background: linear-gradient(90deg, var(--green), #6e9c87, var(--green)) !important; background-size: 200% 100%; animation: progress-shimmer 1.25s linear infinite; }
+@keyframes progress-shimmer { to { background-position: -200% 0; } }
+.progress-cancel { margin-top: 14px; border: 1px solid #d8c6bd; border-radius: 999px; background: transparent; color: #8a5546; padding: 7px 12px; font: 700 10px ui-monospace, monospace; transition: background .2s ease, border-color .2s ease, color .2s ease; }
+.progress-cancel:hover { border-color: #b98b7b; background: #fff4ee; color: #713f32; }
+.progress-cancel:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.progress-labels { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; color: #8b8578; font: 9px ui-monospace, monospace; }
 .workspace { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 24px; align-items: start; margin: 10px 0 58px; }
 .meta-card, .reader-card { background: var(--card); border: 1px solid var(--line); box-shadow: 0 10px 35px rgba(71,64,51,.07); }
 .meta-card { padding: 14px; position: sticky; top: 18px; }
@@ -67,6 +81,9 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .meta-card dl div { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e7e0d3; font: 11px ui-monospace, monospace; }
 .meta-card dt { color: #8b8578; }.meta-card dd { margin: 0; font-weight: 700; }
 .reader-toolbar { min-height: 64px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid var(--line); }
+.reading-progress { height: 4px; overflow: hidden; background: #e8e5db; }
+.reading-progress span { display: block; height: 100%; background: var(--accent); transition: width .2s ease; }
+.reading-progress-label { margin-left: auto; color: var(--green); white-space: nowrap; font: 700 10px ui-monospace, monospace; }
 .view-switch,.export-actions { display: flex; gap: 5px; flex-wrap: wrap; }
 .reader-toolbar button { min-height: 34px; border: 1px solid transparent; background: transparent; color: #777266; display: inline-flex; align-items: center; gap: 5px; padding: 0 9px; font: 700 10px ui-monospace, monospace; }
 .view-switch button.active { color: var(--green); background: var(--soft-green); border-color: #c6d5cc; }
@@ -77,5 +94,5 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .caption-row { display: grid; grid-template-columns: 54px 1fr; gap: 16px; padding: 10px 0; border-bottom: 1px solid #eee8dc; }
 .caption-row time { color: var(--accent); font: 10px ui-monospace, monospace; padding-top: 3px; }.caption-row span { line-height: 1.55; }
 footer { display: flex; justify-content: space-between; gap: 18px; border-top: 1px solid var(--line); padding-top: 18px; color: #898376; font: 10px ui-monospace, monospace; }
-@media (max-width: 900px) { .hero { grid-template-columns: 1fr; gap: 34px; padding-inline: 0; } .workspace { grid-template-columns: 1fr; }.meta-card { position: static; display: grid; grid-template-columns: 180px 1fr; gap: 12px; }.meta-card dl { grid-column: 1/-1; }.reader-toolbar { align-items: flex-start; flex-direction: column; } }
-@media (max-width: 600px) { .shell { padding-inline: 16px; }.topbar { height: 70px; }.hero { padding-top: 42px; }.hero h1 { font-size: 46px; }.input-card { padding: 17px; }.input-actions { grid-template-columns: 1fr; }.workspace { margin-top: 0; }.meta-card { grid-template-columns: 1fr; }.reader-body { padding: 24px 20px; }.flow { flex-wrap: wrap; }.status { display: none; }footer { flex-direction: column; } }
+@media (max-width: 900px) { .hero { grid-template-columns: 1fr; gap: 34px; padding-inline: 0; } .workspace { grid-template-columns: 1fr; }.meta-card { position: static; display: grid; grid-template-columns: 180px 1fr; gap: 12px; }.meta-card dl { grid-column: 1/-1; }.reader-toolbar { align-items: flex-start; flex-direction: column; }.reading-progress-label { margin-left: 0; order: 3; } }
+@media (max-width: 600px) { .shell { padding-inline: 16px; }.topbar { height: 70px; }.hero { padding-top: 42px; }.hero h1 { font-size: 46px; }.input-card { padding: 17px; }.input-actions { grid-template-columns: 1fr; }.workspace { margin-top: 0; }.meta-card { grid-template-columns: 1fr; }.reader-body { padding: 24px 20px; }.flow { flex-wrap: wrap; }.status { display: none; }footer { flex-direction: column; }.progress-heading { align-items: flex-start; }.progress-count { margin-left: auto; }.progress-labels { font-size: 8px; }.progress-labels span:nth-child(3) { display: none; } }
