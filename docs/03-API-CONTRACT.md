@@ -66,6 +66,10 @@ Nếu worker chạy remote, Next.js gửi `Authorization: Bearer ...` từ `TRAN
 | 422 | `UNSUPPORTED_PLATFORM` | URL hợp lệ nhưng chưa nhận diện nền tảng |
 | 422 | `PROVIDER_NOT_READY` | Đã nhận diện nền tảng nhưng chưa có adapter |
 | 422 | `TRANSCRIPT_NOT_FOUND` | Không có caption khả dụng |
+| 502 | `VIDEO_UNAVAILABLE` | Video bị gỡ, private hoặc không thể truy cập |
+| 502 | `WORKER_UNAVAILABLE` | Không kết nối hoặc worker gặp lỗi |
+| 502 | `WORKER_UNAUTHORIZED` | Token giữa app và worker không khớp |
+| 503 | `YOUTUBE_RATE_LIMITED` | YouTube đang giới hạn request |
 | 502 | `UPSTREAM_ERROR` | Provider/upstream thất bại |
 
 ## Ghi chú contract
@@ -74,4 +78,5 @@ Nếu worker chạy remote, Next.js gửi `Authorization: Bearer ...` từ `TRAN
 - `segments` đã được làm sạch và loại segment có text rỗng.
 - `202` chỉ có nghĩa là job đã được nhận, không phải transcript đã sẵn sàng.
 - API hiện chưa version hóa vì mới là MVP; khi breaking change xuất hiện phải cập nhật client, test và tài liệu cùng lúc.
+- UI không hiển thị raw exception; client ánh xạ `code` sang thông báo tiếng Việt và hành động retry phù hợp.
 - Static review xác nhận shape từ source; chưa có kiểm thử HTTP runtime với upstream thật.

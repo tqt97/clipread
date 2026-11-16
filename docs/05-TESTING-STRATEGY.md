@@ -54,6 +54,11 @@ Test tại domain seam `domain/knowledge.ts`:
 - action items nhận diện được mẫu câu Việt/Anh;
 - Q&A chỉ trả về các đoạn transcript khớp, không sinh nội dung ngoài nguồn.
 
+### Error presentation
+
+- mã lỗi API được chuyển thành thông báo tiếng Việt có hướng dẫn hành động;
+- lỗi network, timeout, worker unavailable và video unavailable có hành vi retry riêng.
+
 ## 3. Provider contract tests
 
 Mỗi provider phải qua cùng test contract:

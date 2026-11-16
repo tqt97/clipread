@@ -4,7 +4,7 @@
 
 ## 1. Mục tiêu
 
-ClipRead là web app tập trung vào một nhiệm vụ duy nhất: **biến nội dung video thành nội dung có thể đọc và xuất ra file**. Tìm kiếm là hướng phát triển, chưa phải behavior hiện tại.
+ClipRead là web app tập trung vào một nhiệm vụ duy nhất: **biến nội dung video thành nội dung có thể đọc và xuất ra file**. Tìm kiếm và derived knowledge đã có ở mức deterministic; transcript gốc vẫn là source of truth.
 
 Mental model của sản phẩm:
 
@@ -31,6 +31,8 @@ Video → Readable Knowledge
 - Metadata: title, author, duration, thumbnail khi provider trả về được.
 - Chế độ bài đọc dễ đọc.
 - Chế độ caption giữ timestamp.
+- Tìm kiếm, highlight và cụm từ khóa deterministic.
+- Summary trích xuất ngắn, action items, grounded Q&A, bookmark và notes local.
 - Copy transcript.
 - Export Markdown.
 - Export TXT.
@@ -52,7 +54,7 @@ Nếu chưa bật worker, hệ thống trả `PROVIDER_NOT_READY`; khi worker đ
 
 - Whisper / speech-to-text fallback trực tiếp trong Vercel route.
 - Audio download trực tiếp trong Vercel route.
-- AI summary.
+- Abstractive AI summary và semantic search bằng embedding.
 - Saved library/history.
 - Authentication.
 - Queue bền vững nhiều worker.

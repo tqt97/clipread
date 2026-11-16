@@ -6,11 +6,11 @@ ClipRead là web app ưu tiên caption: người dùng dán đường dẫn vide
 
 ## Phạm vi MVP
 
-Đã có: URL YouTube công khai có caption, metadata, chế độ bài đọc, chế độ caption kèm timestamp, copy, xuất `.md`/`.txt`/`.srt`, lựa chọn ngôn ngữ Việt/Anh/Nhật. MVP không có tài khoản, cơ sở dữ liệu hay lưu trữ lâu dài.
+Đã có: URL YouTube công khai có caption, metadata, chế độ bài đọc, chế độ caption kèm timestamp, tìm kiếm và highlight, cụm từ khóa, summary trích xuất ngắn, action items, Q&A grounded, bookmark/notes local, copy, xuất `.md`/`.txt`/`.srt` và export knowledge `.md`. MVP không có tài khoản, cơ sở dữ liệu hay lưu trữ lâu dài.
 
 TikTok và Facebook có pipeline thử nghiệm qua worker local khi `TRANSCRIPTION_WORKER_URL` đã cấu hình. Vì chưa có public URL regression matrix, chưa xem đây là production guarantee. Nếu chưa bật worker, API trả `PROVIDER_NOT_READY`.
 
-Chưa có: tóm tắt AI, thư viện lưu trữ và authentication. Tải audio và speech-to-text chỉ chạy trong worker local, không chạy trực tiếp trong route Vercel.
+Chưa có: abstractive summary, semantic search bằng embedding, thư viện lưu trữ và authentication. Summary/Q&A hiện chỉ dùng transcript làm nguồn, không gọi API AI trả phí. Tải audio và speech-to-text chỉ chạy trong worker local, không chạy trực tiếp trong route Vercel.
 
 ## Cấu trúc chính
 
@@ -66,11 +66,21 @@ Khi deploy tại `https://clipread-five.vercel.app/`, không dùng URL local ở
 npm run check
 ```
 
+`npm run check` chạy typecheck, domain tests, worker tests và production build.
+
 ## Triển khai
 
 Vercel tự nhận diện Next.js. Node.js tối thiểu là 22; YouTube caption-only không cần database hoặc environment variable. Nếu bật worker, cần cấu hình `TRANSCRIPTION_WORKER_URL` và `TRANSCRIPTION_WORKER_TOKEN` trên Vercel. Route transcript chạy Node.js runtime với giới hạn 30 giây.
 
 Xem hướng dẫn CI/CD và deploy đầy đủ tại [docs/11-CI-CD-AND-DEPLOYMENT.md](docs/11-CI-CD-AND-DEPLOYMENT.md).
+
+## Lỗi thường gặp
+
+- `Không kết nối được`: kiểm tra mạng, URL deployment và thử lại.
+- `Worker đang không khả dụng`: kiểm tra `TRANSCRIPTION_WORKER_URL` và worker process.
+- `Worker chưa được xác thực`: đối chiếu `TRANSCRIPTION_WORKER_TOKEN` ở Vercel với `WORKER_AUTH_TOKEN` ở worker.
+- `YouTube đang giới hạn truy cập`: dùng remote worker hoặc chờ rồi thử lại.
+- `Không tìm thấy transcript`: bật worker để fallback Whisper cho video không có caption.
 
 ## Giới hạn cần biết
 
