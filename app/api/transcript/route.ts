@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ document });
   } catch (error) {
     if (error instanceof TranscriptionWorkerError) {
-      return NextResponse.json(apiError('UPSTREAM_ERROR', error.status === 401
+      return NextResponse.json(apiError(error.status === 401 ? 'WORKER_UNAUTHORIZED' : 'WORKER_UNAVAILABLE', error.status === 401
         ? 'Worker transcription từ chối xác thực. Hãy kiểm tra token cấu hình.'
         : 'Worker transcription hiện không khả dụng.'), { status: error.status === 401 ? 502 : 503 });
     }
@@ -57,22 +57,22 @@ export async function POST(request: Request) {
           const job = await submitTranscriptionJob(url, language);
           return NextResponse.json(job, { status: 202 });
         } catch {
-          return NextResponse.json(apiError('UPSTREAM_ERROR', 'Không thể khởi động worker transcription lúc này.'), { status: 502 });
+          return NextResponse.json(apiError('WORKER_UNAVAILABLE', 'Không thể khởi động worker transcription lúc này.'), { status: 502 });
         }
       }
 
       if (error.code === 'YOUTUBE_RATE_LIMITED') {
-        return NextResponse.json(apiError('UPSTREAM_ERROR', 'YouTube đang giới hạn request từ Vercel. Cấu hình worker remote để lấy transcript từ máy chủ riêng.'), { status: 503 });
+        return NextResponse.json(apiError('YOUTUBE_RATE_LIMITED', 'YouTube đang giới hạn request từ Vercel. Cấu hình worker remote để lấy transcript từ máy chủ riêng.'), { status: 503 });
       }
       return NextResponse.json(apiError('TRANSCRIPT_NOT_FOUND', 'Video này không có caption/subtitle khả dụng. MVP chưa chạy speech-to-text từ audio.'), { status: 422 });
     }
 
     if (error instanceof YouTubeProviderError && error.code === 'VIDEO_UNAVAILABLE') {
-      return NextResponse.json(apiError('UPSTREAM_ERROR', 'Video YouTube không khả dụng hoặc đã bị gỡ.'), { status: 502 });
+      return NextResponse.json(apiError('VIDEO_UNAVAILABLE', 'Video YouTube không khả dụng hoặc đã bị gỡ.'), { status: 502 });
     }
 
     if (error instanceof YouTubeProviderError && error.code === 'INVALID_LANGUAGE') {
-      return NextResponse.json(apiError('INVALID_REQUEST', 'Ngôn ngữ transcript không hợp lệ.'), { status: 400 });
+      return NextResponse.json(apiError('INVALID_LANGUAGE', 'Ngôn ngữ transcript không hợp lệ.'), { status: 400 });
     }
 
     return NextResponse.json(apiError('UPSTREAM_ERROR', 'Không thể lấy transcript lúc này. YouTube có thể đã thay đổi hoặc đang giới hạn request.'), { status: 502 });

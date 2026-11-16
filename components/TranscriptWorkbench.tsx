@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type UIEvent } from 'react';
 import { BookOpenText, Bookmark, BookmarkCheck, Check, ChevronLeft, ChevronRight, Clipboard, Download, ExternalLink, FileText, Link2, LoaderCircle, MessageCircleQuestion, Search, Sparkles, StickyNote, Subtitles, Text } from 'lucide-react';
 import type { TranscriptDocument } from '@/domain/transcript';
+import { presentTranscriptError, type TranscriptErrorPresentation } from '@/domain/api';
 import { normalizeTranscriptionJobStage, type TranscriptionJobResponse, type TranscriptionJobStage } from '@/domain/transcription-job';
 import { detectPlatform, toMarkdown, toPlainText, toReadableParagraphs, toSrt } from '@/domain/transcript';
 import { extractTranscriptInsights, normalizeSearchText, searchTranscript, toTimestampUrl } from '@/domain/insights';
@@ -12,6 +13,12 @@ type ViewMode = 'read' | 'raw';
 const POLL_TIMEOUT_MS = 15 * 60 * 1000;
 const INITIAL_POLL_DELAY_MS = 500;
 const MAX_POLL_DELAY_MS = 3000;
+
+class TranscriptClientError extends Error {
+  constructor(public readonly code?: string, message?: string) {
+    super(message || 'Transcript request failed.');
+  }
+}
 
 const waitFor = (milliseconds: number, signal: AbortSignal): Promise<void> => new Promise((resolve, reject) => {
   const onAbort = () => {
@@ -66,17 +73,30 @@ const renderSearchText = (text: string, query: string) => {
   const normalizedQuery = normalizeSearchText(query.trim());
   if (!normalizedQuery) return text;
 
-  const ranges: Array<[number, number]> = [];
-  for (let start = 0; start < text.length; start += 1) {
-    let normalizedCandidate = '';
-    for (let end = start; end < text.length; end += 1) {
-      normalizedCandidate = normalizeSearchText(text.slice(start, end + 1));
-      if (normalizedCandidate === normalizedQuery) {
-        ranges.push([start, end + 1]);
-        break;
-      }
-      if (normalizedCandidate.length > normalizedQuery.length || !normalizedQuery.startsWith(normalizedCandidate)) break;
+  const originalChars = Array.from(text);
+  let normalizedText = '';
+  const normalizedStarts: number[] = [];
+  const normalizedEnds: number[] = [];
+  let originalOffset = 0;
+  originalChars.forEach((character) => {
+    const normalized = normalizeSearchText(character);
+    const originalEnd = originalOffset + character.length;
+    for (let index = 0; index < normalized.length; index += 1) {
+      normalizedStarts.push(originalOffset);
+      normalizedEnds.push(originalEnd);
     }
+    normalizedText += normalized;
+    originalOffset = originalEnd;
+  });
+
+  const ranges: Array<[number, number]> = [];
+  let searchFrom = 0;
+  while (searchFrom < normalizedText.length) {
+    const matchStart = normalizedText.indexOf(normalizedQuery, searchFrom);
+    if (matchStart < 0) break;
+    const matchEnd = matchStart + normalizedQuery.length - 1;
+    ranges.push([normalizedStarts[matchStart], normalizedEnds[matchEnd]]);
+    searchFrom = matchEnd + 1;
   }
   if (ranges.length === 0) return text;
 
@@ -96,7 +116,7 @@ export const TranscriptWorkbench = () => {
   const [url, setUrl] = useState('');
   const [language, setLanguage] = useState('auto');
   const [document, setDocument] = useState<TranscriptDocument | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<TranscriptErrorPresentation | null>(null);
   const [loading, setLoading] = useState(false);
   const [progressStage, setProgressStage] = useState<TranscriptionJobStage>('checking_captions');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -208,7 +228,11 @@ export const TranscriptWorkbench = () => {
 
   useEffect(() => {
     if (!document || !storageHydratedRef.current) return;
-    window.localStorage.setItem(`clipread:workspace:${document.sourceUrl}`, JSON.stringify({ bookmarks: bookmarkedSegments, notes }));
+    try {
+      window.localStorage.setItem(`clipread:workspace:${document.sourceUrl}`, JSON.stringify({ bookmarks: bookmarkedSegments, notes }));
+    } catch {
+      setNotice('Không thể lưu bookmark/ghi chú trên trình duyệt này. Nội dung transcript vẫn hoạt động bình thường.');
+    }
   }, [document, bookmarkedSegments, notes]);
 
   useEffect(() => () => pollingAbortRef.current?.abort(), []);
@@ -288,8 +312,8 @@ export const TranscriptWorkbench = () => {
         body: JSON.stringify({ url: url.trim(), language }),
         signal: controller.signal,
       });
-      const payload = await response.json() as TranscriptionJobResponse & { error?: string };
-      if (!response.ok) throw new Error(payload.error || 'Không thể lấy transcript.');
+      const payload = await response.json() as TranscriptionJobResponse & { error?: string; code?: string };
+      if (!response.ok) throw new TranscriptClientError(payload.code, payload.error);
 
       if (response.status === 202 && payload.jobId) {
         let job = payload;
@@ -304,25 +328,29 @@ export const TranscriptWorkbench = () => {
             signal: controller.signal,
           });
           job = await statusResponse.json() as TranscriptionJobResponse;
-          if (!statusResponse.ok) throw new Error(job.error || 'Không thể đọc trạng thái transcription.');
+          if (!statusResponse.ok) throw new TranscriptClientError(job.code, job.error);
           setProgressStage(normalizeTranscriptionJobStage(job.stage, job.status === 'queued' ? 'queued' : 'fetching_metadata'));
           pollDelay = Math.min(MAX_POLL_DELAY_MS, Math.round(pollDelay * 1.5));
         }
-        if (job.status === 'failed' || !job.document) throw new Error(job.error || 'Không thể tạo transcript.');
+        if (job.status === 'failed' || !job.document) throw new TranscriptClientError(job.code, job.error);
         setProgressStage('completed');
         setDocument(job.document);
       } else if (payload.document) {
         setProgressStage('completed');
         setDocument(payload.document);
       } else {
-        throw new Error(payload.error || 'Không thể lấy transcript.');
+        throw new TranscriptClientError(payload.code, payload.error);
       }
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === 'AbortError' && pollingCancelledRef.current) return;
       if (caught instanceof Error && caught.message === 'TRANSCRIPTION_TIMEOUT') {
-        setError('Worker đã xử lý quá lâu. Bạn có thể thử lại với video ngắn hơn.');
+        setError(presentTranscriptError(undefined, 'timeout'));
+      } else if (caught instanceof TypeError) {
+        setError(presentTranscriptError(undefined, 'network'));
+      } else if (caught instanceof TranscriptClientError) {
+        setError(presentTranscriptError(caught.code));
       } else {
-        setError(caught instanceof Error ? caught.message : 'Không thể lấy transcript.');
+        setError(presentTranscriptError());
       }
     } finally {
       if (pollingAbortRef.current === controller) pollingAbortRef.current = null;
@@ -384,7 +412,13 @@ export const TranscriptWorkbench = () => {
         </div>
       </section>
 
-      {error && <section className="error-panel"><strong>Chưa thể tạo bài đọc</strong><p>{error}</p></section>}
+      {error && (
+        <section className="error-panel" role="alert">
+          <strong>{error.title}</strong>
+          <p>{error.message}</p>
+          {error.retryable && <button type="button" onClick={extract}>Thử lại</button>}
+        </section>
+      )}
 
       {loading && (
         <section className="progress-panel" aria-live="polite" aria-busy="true">
