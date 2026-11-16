@@ -27,6 +27,7 @@ test('extractTranscriptInsights returns deterministic keywords and highlights wi
   assert.deepEqual(segments, snapshot);
   const workerKeyword = insights.keywords.find((keyword) => keyword.term === 'worker');
   assert.deepEqual(workerKeyword, { term: 'worker', count: 2, segmentIds: [0, 1] });
+  assert.deepEqual(insights.keywords.find((keyword) => keyword.term === 'worker local'), { term: 'worker local', count: 2, segmentIds: [0, 1] });
   assert.equal(insights.keywords.some((keyword) => keyword.term === 'của'), false);
   assert.equal(insights.highlights.length, 2);
   assert.equal(insights.highlights[0].segmentId, 1);
@@ -39,6 +40,14 @@ test('extractTranscriptInsights does not invent highlights for a short non-repet
   ]);
 
   assert.deepEqual(insights.highlights, []);
+});
+
+test('keyword phrases stay contiguous and do not cross stop words', () => {
+  const insights = extractTranscriptInsights([
+    { text: 'Worker để chạy nhanh.', offset: 0, duration: 2 },
+    { text: 'Worker để chạy ổn định.', offset: 3, duration: 2 },
+  ]);
+  assert.equal(insights.keywords.some((keyword) => keyword.term === 'worker chạy'), false);
 });
 
 test('toTimestampUrl creates a YouTube timestamp link and keeps other platforms unchanged', () => {

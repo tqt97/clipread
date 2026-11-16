@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type ReactNode, type UIEvent } from 'react';
-import { BookOpenText, Check, ChevronLeft, ChevronRight, Clipboard, Download, ExternalLink, FileText, Link2, LoaderCircle, Search, Sparkles, Subtitles, Text } from 'lucide-react';
+import { BookOpenText, Bookmark, BookmarkCheck, Check, ChevronLeft, ChevronRight, Clipboard, Download, ExternalLink, FileText, Link2, LoaderCircle, MessageCircleQuestion, Search, Sparkles, StickyNote, Subtitles, Text } from 'lucide-react';
 import type { TranscriptDocument } from '@/domain/transcript';
 import { normalizeTranscriptionJobStage, type TranscriptionJobResponse, type TranscriptionJobStage } from '@/domain/transcription-job';
 import { detectPlatform, toMarkdown, toPlainText, toReadableParagraphs, toSrt } from '@/domain/transcript';
 import { extractTranscriptInsights, normalizeSearchText, searchTranscript, toTimestampUrl } from '@/domain/insights';
+import { answerTranscriptQuestion, buildTranscriptChapters, extractActionItems, extractiveSummary } from '@/domain/knowledge';
 
 type ViewMode = 'read' | 'raw';
 const POLL_TIMEOUT_MS = 15 * 60 * 1000;
@@ -111,10 +112,19 @@ export const TranscriptWorkbench = () => {
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const [activeSegmentId, setActiveSegmentId] = useState<number | null>(null);
   const segmentRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const [bookmarkedSegments, setBookmarkedSegments] = useState<number[]>([]);
+  const [notes, setNotes] = useState<Record<number, string>>({});
+  const [noteDraft, setNoteDraft] = useState('');
+  const [question, setQuestion] = useState('');
+  const storageHydratedRef = useRef(false);
 
   const platform = useMemo(() => detectPlatform(url), [url]);
   const paragraphs = useMemo(() => document ? toReadableParagraphs(document.segments) : [], [document]);
   const insights = useMemo(() => document ? extractTranscriptInsights(document.segments) : { keywords: [], highlights: [] }, [document]);
+  const summary = useMemo(() => document ? extractiveSummary(document.segments, insights.keywords, 3) : [], [document, insights.keywords]);
+  const chapters = useMemo(() => document ? buildTranscriptChapters(document.segments) : [], [document]);
+  const actionItems = useMemo(() => document ? extractActionItems(document.segments) : [], [document]);
+  const answer = useMemo(() => document ? answerTranscriptQuestion(document.segments, question) : { confidence: 'low' as const, results: [] }, [document, question]);
   const searchResults = useMemo(() => document ? searchTranscript(document.segments, searchQuery) : [], [document, searchQuery]);
   const wordCount = useMemo(() => paragraphs.join(' ').split(/\s+/).filter(Boolean).length, [paragraphs]);
   const readingMinutes = Math.max(1, Math.ceil(wordCount / 220));
@@ -179,6 +189,28 @@ export const TranscriptWorkbench = () => {
     return () => window.cancelAnimationFrame(frame);
   }, [document, viewMode]);
 
+  useEffect(() => {
+    if (!document) return;
+    storageHydratedRef.current = false;
+    const storageKey = `clipread:workspace:${document.sourceUrl}`;
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(storageKey) || '{}') as { bookmarks?: number[]; notes?: Record<number, string> };
+      setBookmarkedSegments(Array.isArray(saved.bookmarks) ? saved.bookmarks : []);
+      setNotes(saved.notes && typeof saved.notes === 'object' ? saved.notes : {});
+    } catch {
+      setBookmarkedSegments([]);
+      setNotes({});
+    }
+    storageHydratedRef.current = true;
+    setNoteDraft('');
+    setQuestion('');
+  }, [document]);
+
+  useEffect(() => {
+    if (!document || !storageHydratedRef.current) return;
+    window.localStorage.setItem(`clipread:workspace:${document.sourceUrl}`, JSON.stringify({ bookmarks: bookmarkedSegments, notes }));
+  }, [document, bookmarkedSegments, notes]);
+
   useEffect(() => () => pollingAbortRef.current?.abort(), []);
 
   const handleReaderScroll = (event: UIEvent<HTMLDivElement>) => {
@@ -196,6 +228,40 @@ export const TranscriptWorkbench = () => {
     setViewMode('raw');
     setActiveSegmentId(segmentId);
     window.history.replaceState(null, '', `#segment-${segmentId}`);
+  };
+
+  const toggleBookmark = (segmentId: number) => {
+    setBookmarkedSegments((current) => current.includes(segmentId)
+      ? current.filter((id) => id !== segmentId)
+      : [...current, segmentId].sort((a, b) => a - b));
+  };
+
+  const saveNote = (segmentId: number) => {
+    const text = noteDraft.trim();
+    if (!text) return;
+    setNotes((current) => ({ ...current, [segmentId]: text }));
+    setNoteDraft('');
+    setNotice('Đã lưu ghi chú trên thiết bị này.');
+  };
+
+  const exportKnowledge = () => {
+    if (!document) return;
+    const lines = [
+      `# ${document.title}`,
+      '',
+      '## Tóm tắt',
+      ...summary.map((item) => `- [${formatTimestamp(item.offset)}] ${item.text}`),
+      '',
+      '## Chapters',
+      ...chapters.map((chapter) => `- [${formatTimestamp(chapter.offset)}] ${chapter.title}`),
+      '',
+      '## Action items',
+      ...(actionItems.length ? actionItems.map((item) => `- [ ] [${formatTimestamp(item.offset)}] ${item.text}`) : ['- Không phát hiện action item']),
+      '',
+      '## Highlights',
+      ...insights.highlights.map((item) => `- [${formatTimestamp(item.offset)}] ${item.text}`),
+    ];
+    downloadText(lines.join('\n'), `${base}-notes.md`, 'text/markdown');
   };
 
   const moveSearch = (direction: 1 | -1) => {
@@ -381,7 +447,7 @@ export const TranscriptWorkbench = () => {
                 )}
                 {insights.keywords.length > 0 && (
                   <div className="keyword-section">
-                    <span className="keyword-title">Keywords</span>
+                    <span className="keyword-title">Cụm từ khóa</span>
                     <div className="keyword-list">
                       {insights.keywords.map((keyword) => (
                         <button
@@ -401,6 +467,25 @@ export const TranscriptWorkbench = () => {
                 )}
               </section>
             )}
+            <section className="knowledge-card" aria-label="Tóm tắt và ghi chú">
+              <div className="knowledge-heading">
+                <strong><Sparkles size={15} /> Hiểu nhanh</strong>
+                <button type="button" onClick={exportKnowledge} aria-label="Xuất tóm tắt và highlights"><Download size={14} /> Xuất</button>
+              </div>
+              <h3>Tóm tắt</h3>
+              {summary.length > 0
+                ? <p className="summary-paragraph">{summary.map((item) => item.text).join(' ')}</p>
+                : <p className="muted-item">Chưa đủ dữ liệu để tóm tắt.</p>}
+              {actionItems.length > 0 && <>
+                <h3>Action items</h3>
+                <ul className="action-list">{actionItems.map((item) => <li key={item.segmentId}><button type="button" onClick={() => scrollToSegment(item.segmentId)}><span>□</span>{item.text}</button></li>)}</ul>
+              </>}
+              <div className="qa-box">
+                <label htmlFor="transcript-question"><MessageCircleQuestion size={14} /> Hỏi transcript</label>
+                <input id="transcript-question" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ví dụ: worker dùng để làm gì?" />
+                {question.trim() && <div className="qa-answer"><small>Độ tin cậy: {answer.confidence === 'high' ? 'cao' : answer.confidence === 'medium' ? 'vừa' : 'thấp'}</small>{answer.results.length > 0 ? answer.results.map((result) => <button type="button" key={result.segmentId} onClick={() => scrollToSegment(result.segmentId)}><time>{formatTimestamp(result.offset)}</time>{result.text}</button>) : <p>Không tìm thấy câu trả lời trực tiếp trong transcript.</p>}</div>}
+              </div>
+            </section>
           </aside>
 
           <article className="reader-card">
@@ -458,9 +543,19 @@ export const TranscriptWorkbench = () => {
                     {formatTimestamp(segment.offset)} <ExternalLink size={11} />
                   </a>
                   <span>{renderSearchText(segment.text, searchQuery)}</span>
+                  <div className="caption-tools">
+                    <button type="button" onClick={() => toggleBookmark(index)} aria-label={bookmarkedSegments.includes(index) ? 'Bỏ bookmark' : 'Đánh dấu bookmark'} title={bookmarkedSegments.includes(index) ? 'Bỏ bookmark' : 'Bookmark'}>{bookmarkedSegments.includes(index) ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}</button>
+                    <button type="button" onClick={() => { setActiveSegmentId(index); setNoteDraft(notes[index] || ''); }} aria-label="Thêm ghi chú" title="Ghi chú"><StickyNote size={14} /></button>
+                  </div>
                 </div>
               ))}
             </div>
+            {viewMode === 'raw' && activeSegmentId !== null && (
+              <div className="note-editor">
+                <label htmlFor="segment-note">Ghi chú cho đoạn {formatTimestamp(document.segments[activeSegmentId]?.offset ?? 0)}</label>
+                <div><input id="segment-note" value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} placeholder="Viết ghi chú riêng của bạn..." /><button type="button" onClick={() => saveNote(activeSegmentId)}>Lưu ghi chú</button></div>
+              </div>
+            )}
           </article>
         </section>
       )}

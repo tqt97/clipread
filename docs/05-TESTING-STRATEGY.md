@@ -45,6 +45,15 @@ Test tại domain seam `domain/insights.ts`:
 - highlights có thể truy về segment nguồn;
 - YouTube timestamp URL thêm `t`, platform khác giữ nguyên URL.
 
+### Knowledge features
+
+Test tại domain seam `domain/knowledge.ts`:
+
+- chapters tách theo khoảng ngắt thời gian;
+- extractive summary chỉ chọn đoạn có keyword và giữ source order;
+- action items nhận diện được mẫu câu Việt/Anh;
+- Q&A chỉ trả về các đoạn transcript khớp, không sinh nội dung ngoài nguồn.
+
 ## 3. Provider contract tests
 
 Mỗi provider phải qua cùng test contract:

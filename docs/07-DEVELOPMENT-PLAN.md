@@ -90,7 +90,9 @@ Biến transcript từ “text dump” thành trải nghiệm đọc có giá tr
 
 ### P1
 
-- [ ] Reading progress.
+- [x] Reading progress.
+- [x] Bookmark và notes local trên thiết bị.
+- [x] Export summary, chapters, action items và highlights.
 - [ ] Font size controls.
 - [ ] Focus/reader mode.
 - [ ] Copy selected paragraph.
@@ -110,11 +112,14 @@ Giúp user tiêu thụ nội dung nhanh hơn transcript nguyên văn.
 
 ### Features
 
-- [ ] Summary.
-- [ ] Key ideas.
-- [ ] Chapters.
-- [ ] Action items.
+- [x] Extractive summary có timestamp.
+- [x] Key ideas/cụm từ khóa deterministic, ưu tiên phrase tiếng Việt thay vì token đơn.
+- [x] Chapters theo time-gap và nhóm caption.
+- [x] Action items heuristic có link về nguồn.
+- [x] Grounded Q&A trả về evidence trong transcript.
 - [ ] Translation.
+
+Semantic search bằng embedding local vẫn để sau benchmark; hiện tại search là lexical và minh bạch.
 
 ### Architecture rule
 

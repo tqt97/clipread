@@ -54,7 +54,25 @@ const tokenEntriesOf = (value: string): Array<{ key: string; label: string }> =>
   .map((token) => ({ key: fold(token), label: token }))
   .filter(({ key }) => key.length > 2 && !STOP_WORDS.has(key));
 
-const tokensOf = (value: string): string[] => tokenEntriesOf(value).map(({ key }) => key);
+const keywordEntriesOf = (value: string): Array<{ key: string; label: string; words: number }> => {
+  const entries = (cleanSegmentText(value).match(TOKEN_PATTERN) || [])
+    .map((token) => ({ key: fold(token), label: token }));
+  const candidates = entries
+    .filter(({ key }) => key.length > 2 && !STOP_WORDS.has(key))
+    .map((entry) => ({ ...entry, words: 1 }));
+  for (let size = 2; size <= 3; size += 1) {
+    for (let index = 0; index <= entries.length - size; index += 1) {
+      const phrase = entries.slice(index, index + size);
+      if (phrase.some(({ key }) => key.length <= 2 || STOP_WORDS.has(key))) continue;
+      candidates.push({
+        key: phrase.map((entry) => entry.key).join(' '),
+        label: phrase.map((entry) => entry.label).join(' '),
+        words: size,
+      });
+    }
+  }
+  return candidates;
+};
 
 const countOccurrences = (value: string, query: string): number => {
   const foldedValue = fold(value);
@@ -83,11 +101,11 @@ export const searchTranscript = (segments: TranscriptSegment[], query: string): 
 };
 
 const extractKeywords = (segments: TranscriptSegment[], limit: number): TranscriptKeyword[] => {
-  const stats = new Map<string, { term: string; count: number; segmentIds: number[] }>();
+  const stats = new Map<string, { term: string; count: number; segmentIds: number[]; words: number }>();
   segments.forEach((segment, segmentId) => {
     const seenInSegment = new Set<string>();
-    tokenEntriesOf(segment.text).forEach(({ key, label }) => {
-      const current = stats.get(key) || { term: label, count: 0, segmentIds: [] };
+    keywordEntriesOf(segment.text).forEach(({ key, label, words }) => {
+      const current = stats.get(key) || { term: label, count: 0, segmentIds: [], words };
       current.count += 1;
       if (!seenInSegment.has(key)) {
         current.segmentIds.push(segmentId);
@@ -98,7 +116,7 @@ const extractKeywords = (segments: TranscriptSegment[], limit: number): Transcri
   });
 
   return [...stats.entries()]
-    .sort(([termA, valueA], [termB, valueB]) => valueB.count - valueA.count || valueB.segmentIds.length - valueA.segmentIds.length || (termA < termB ? -1 : termA > termB ? 1 : 0))
+    .sort(([termA, valueA], [termB, valueB]) => (valueB.count * (valueB.words > 1 ? 2 : 1)) - (valueA.count * (valueA.words > 1 ? 2 : 1)) || valueB.segmentIds.length - valueA.segmentIds.length || valueB.words - valueA.words || (termA < termB ? -1 : termA > termB ? 1 : 0))
     .slice(0, Math.max(0, limit))
     .map(([, value]) => ({ term: value.term, count: value.count, segmentIds: [...value.segmentIds] }));
 };
@@ -109,8 +127,8 @@ const extractHighlights = (segments: TranscriptSegment[], keywords: TranscriptKe
   return segments
     .map((segment, segmentId) => {
       const text = cleanSegmentText(segment.text);
-      const segmentTerms = new Set(tokensOf(text));
-      const matchedKeywords = [...segmentTerms].filter((term) => recurringTerms.has(term));
+      const foldedText = ` ${fold(text).replace(/[^\p{L}\p{N}]+/gu, ' ')} `;
+      const matchedKeywords = [...recurringTerms].filter((term) => foldedText.includes(` ${term} `));
       const sentenceBonus = /[.!?…]["')\]]?$/.test(text) ? 1 : 0;
       const score = matchedKeywords.length * 100 + text.length + sentenceBonus;
       return {
