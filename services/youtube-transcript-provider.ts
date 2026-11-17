@@ -14,14 +14,14 @@ import { cleanSegmentText, detectPlatform, type TranscriptDocument } from '@/dom
 import type { TranscriptProvider } from './transcript-provider';
 
 export type YouTubeProviderErrorCode =
-  | 'NO_TRANSCRIPT'
-  | 'YOUTUBE_RATE_LIMITED'
-  | 'VIDEO_UNAVAILABLE'
-  | 'INVALID_LANGUAGE'
-  | 'INVALID_URL';
+  'NO_TRANSCRIPT' | 'YOUTUBE_RATE_LIMITED' | 'VIDEO_UNAVAILABLE' | 'INVALID_LANGUAGE' | 'INVALID_URL';
 
 export class YouTubeProviderError extends Error {
-  constructor(public readonly code: YouTubeProviderErrorCode, message: string, options?: ErrorOptions) {
+  constructor(
+    public readonly code: YouTubeProviderErrorCode,
+    message: string,
+    options?: ErrorOptions,
+  ) {
     super(message, options);
   }
 }
@@ -36,30 +36,30 @@ export class YouTubeTranscriptProvider implements TranscriptProvider {
   async getTranscript(url: string, language?: string): Promise<TranscriptDocument> {
     let result: TranscriptResult;
     try {
-      result = await fetchTranscript(url, {
+      result = (await fetchTranscript(url, {
         ...(language && language !== 'auto' ? { lang: language } : {}),
         cache: transcriptCache,
         cacheTTL: 15 * 60 * 1000,
         retries: 0,
         videoDetails: true,
-      }) as TranscriptResult;
+      })) as TranscriptResult;
     } catch (error) {
       if (error instanceof YoutubeTranscriptTooManyRequestError) {
-        throw new YouTubeProviderError(
-          'YOUTUBE_RATE_LIMITED',
-          'YouTube đang giới hạn request từ máy chủ Vercel.',
-          { cause: error },
-        );
+        throw new YouTubeProviderError('YOUTUBE_RATE_LIMITED', 'YouTube đang giới hạn request từ máy chủ Vercel.', {
+          cause: error,
+        });
       }
       if (
-        error instanceof YoutubeTranscriptNotAvailableError
-        || error instanceof YoutubeTranscriptNotAvailableLanguageError
-        || error instanceof YoutubeTranscriptDisabledError
+        error instanceof YoutubeTranscriptNotAvailableError ||
+        error instanceof YoutubeTranscriptNotAvailableLanguageError ||
+        error instanceof YoutubeTranscriptDisabledError
       ) {
         throw new YouTubeProviderError('NO_TRANSCRIPT', 'Video không có caption khả dụng.', { cause: error });
       }
       if (error instanceof YoutubeTranscriptVideoUnavailableError) {
-        throw new YouTubeProviderError('VIDEO_UNAVAILABLE', 'Video YouTube không khả dụng hoặc đã bị gỡ.', { cause: error });
+        throw new YouTubeProviderError('VIDEO_UNAVAILABLE', 'Video YouTube không khả dụng hoặc đã bị gỡ.', {
+          cause: error,
+        });
       }
       if (error instanceof YoutubeTranscriptInvalidLangError) {
         throw new YouTubeProviderError('INVALID_LANGUAGE', 'Ngôn ngữ transcript không hợp lệ.', { cause: error });

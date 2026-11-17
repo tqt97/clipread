@@ -11,16 +11,20 @@ export type TranscriptionJobStage =
   | 'completed';
 
 const transcriptionJobStages: readonly TranscriptionJobStage[] = [
-  'queued', 'fetching_metadata', 'checking_captions', 'downloading_audio',
-  'transcribing', 'finalizing', 'completed',
+  'queued',
+  'fetching_metadata',
+  'checking_captions',
+  'downloading_audio',
+  'transcribing',
+  'finalizing',
+  'completed',
 ];
 
 export const normalizeTranscriptionJobStage = (
   value: unknown,
   fallback: TranscriptionJobStage = 'queued',
-): TranscriptionJobStage => transcriptionJobStages.includes(value as TranscriptionJobStage)
-  ? value as TranscriptionJobStage
-  : fallback;
+): TranscriptionJobStage =>
+  transcriptionJobStages.includes(value as TranscriptionJobStage) ? (value as TranscriptionJobStage) : fallback;
 
 export interface TranscriptionJobResponse {
   jobId: string;

@@ -10,10 +10,20 @@ export async function GET(_request: Request, context: { params: Promise<{ jobId:
     return NextResponse.json(await getTranscriptionJob(jobId));
   } catch (error) {
     if (error instanceof TranscriptionWorkerError) {
-      const status = error.status === 404 ? 404 : error.status === 401 ? 401 : 502;
-      const code = error.status === 401 ? 'WORKER_UNAUTHORIZED' : error.status === 404 ? 'JOB_NOT_FOUND' : 'WORKER_UNAVAILABLE';
+      const isQueueFull = error.code === 'QUEUE_FULL' || error.status === 429;
+      const status = error.status === 404 ? 404 : isQueueFull ? 429 : error.status === 401 ? 401 : 502;
+      const code =
+        error.status === 401
+          ? 'WORKER_UNAUTHORIZED'
+          : error.status === 404
+            ? 'JOB_NOT_FOUND'
+            : isQueueFull
+              ? 'QUEUE_FULL'
+              : 'WORKER_UNAVAILABLE';
       return NextResponse.json(apiError(code, error.message), { status });
     }
-    return NextResponse.json(apiError('WORKER_UNAVAILABLE', 'Không thể đọc trạng thái job transcription.'), { status: 502 });
+    return NextResponse.json(apiError('WORKER_UNAVAILABLE', 'Không thể đọc trạng thái job transcription.'), {
+      status: 502,
+    });
   }
 }

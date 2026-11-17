@@ -10,6 +10,14 @@ test('presentTranscriptError gives actionable worker guidance', () => {
   });
 });
 
+test('presentTranscriptError explains a full worker queue', () => {
+  assert.deepEqual(presentTranscriptError('QUEUE_FULL'), {
+    title: 'Worker đang quá tải',
+    message: 'Có quá nhiều video đang chờ xử lý. Hãy thử lại sau ít phút.',
+    retryable: true,
+  });
+});
+
 test('presentTranscriptError handles network and timeout separately', () => {
   assert.equal(presentTranscriptError(undefined, 'network').retryable, true);
   assert.match(presentTranscriptError(undefined, 'timeout').message, /video ngắn hơn/);

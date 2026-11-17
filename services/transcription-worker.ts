@@ -4,14 +4,17 @@ const workerUrl = process.env.TRANSCRIPTION_WORKER_URL?.replace(/\/$/, '');
 const workerToken = process.env.TRANSCRIPTION_WORKER_TOKEN;
 
 export class TranscriptionWorkerError extends Error {
-  constructor(public readonly status: number, message: string, public readonly code?: string) {
+  constructor(
+    public readonly status: number,
+    message: string,
+    public readonly code?: string,
+  ) {
     super(message);
   }
 }
 
-const requestSignal = (signal?: AbortSignal): AbortSignal => signal
-  ? AbortSignal.any([signal, AbortSignal.timeout(10_000)])
-  : AbortSignal.timeout(10_000);
+const requestSignal = (signal?: AbortSignal): AbortSignal =>
+  signal ? AbortSignal.any([signal, AbortSignal.timeout(10_000)]) : AbortSignal.timeout(10_000);
 
 const workerHeaders = (): HeadersInit => ({
   ...(workerToken ? { Authorization: `Bearer ${workerToken}` } : {}),
@@ -19,7 +22,11 @@ const workerHeaders = (): HeadersInit => ({
 
 export const isTranscriptionWorkerConfigured = (): boolean => Boolean(workerUrl);
 
-export const submitTranscriptionJob = async (url: string, language?: string, signal?: AbortSignal): Promise<TranscriptionJobResponse> => {
+export const submitTranscriptionJob = async (
+  url: string,
+  language?: string,
+  signal?: AbortSignal,
+): Promise<TranscriptionJobResponse> => {
   if (!workerUrl) throw new Error('TRANSCRIPTION_WORKER_NOT_CONFIGURED');
 
   const response = await fetch(`${workerUrl}/jobs`, {
@@ -29,7 +36,14 @@ export const submitTranscriptionJob = async (url: string, language?: string, sig
     signal: requestSignal(signal),
   });
 
-  if (!response.ok) throw new TranscriptionWorkerError(response.status, 'Worker không nhận được job.', response.status === 401 ? 'UNAUTHORIZED' : undefined);
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { error?: string; code?: string };
+    throw new TranscriptionWorkerError(
+      response.status,
+      payload.error || 'Worker không nhận được job.',
+      payload.code || (response.status === 401 ? 'UNAUTHORIZED' : undefined),
+    );
+  }
   return response.json() as Promise<TranscriptionJobResponse>;
 };
 
@@ -43,8 +57,12 @@ export const getTranscriptionJob = async (jobId: string, signal?: AbortSignal): 
   });
 
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({})) as { error?: string; code?: string };
-    throw new TranscriptionWorkerError(response.status, payload.error || 'Không thể đọc trạng thái worker.', payload.code);
+    const payload = (await response.json().catch(() => ({}))) as { error?: string; code?: string };
+    throw new TranscriptionWorkerError(
+      response.status,
+      payload.error || 'Không thể đọc trạng thái worker.',
+      payload.code,
+    );
   }
   return response.json() as Promise<TranscriptionJobResponse>;
 };
