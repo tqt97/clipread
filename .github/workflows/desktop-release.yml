@@ -1,0 +1,116 @@
+name: Desktop Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_RUNTIME_VERSION: '22.14.0'
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS Apple Silicon
+            os: macos-14
+            target: aarch64-apple-darwin
+            node_archive: node-v22.14.0-darwin-arm64.tar.gz
+            node_dir: node-v22.14.0-darwin-arm64
+            ytdlp_asset: yt-dlp_macos
+          - name: macOS Intel
+            os: macos-13
+            target: x86_64-apple-darwin
+            node_archive: node-v22.14.0-darwin-x64.tar.gz
+            node_dir: node-v22.14.0-darwin-x64
+            ytdlp_asset: yt-dlp_macos
+          - name: Windows x64
+            os: windows-2022
+            target: x86_64-pc-windows-msvc
+            node_archive: node-v22.14.0-win-x64.zip
+            node_dir: node-v22.14.0-win-x64
+            ytdlp_asset: yt-dlp.exe
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Install Windows FFmpeg
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install ffmpeg -y --no-progress
+      - name: Install macOS FFmpeg
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg || true
+      - name: Install Node and media runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p desktop/bundle/runtime/bin desktop/bundle/runtime/models
+          curl -fsSL "https://nodejs.org/dist/v${NODE_RUNTIME_VERSION}/${{ matrix.node_archive }}" -o /tmp/node-runtime
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            unzip -q /tmp/node-runtime -d /tmp/node-runtime-dir
+            cp "/tmp/node-runtime-dir/${{ matrix.node_dir }}/node.exe" desktop/bundle/runtime/node.exe
+            curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/${{ matrix.ytdlp_asset }}" -o desktop/bundle/runtime/bin/yt-dlp.exe
+            cp "$(where.exe ffmpeg | head -n 1 | tr -d '\r')" desktop/bundle/runtime/bin/ffmpeg.exe
+          else
+            tar -xzf /tmp/node-runtime -C /tmp
+            cp "/tmp/${{ matrix.node_dir }}/bin/node" desktop/bundle/runtime/node
+            curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/${{ matrix.ytdlp_asset }}" -o desktop/bundle/runtime/bin/yt-dlp
+            cp "$(brew --prefix ffmpeg)/bin/ffmpeg" desktop/bundle/runtime/bin/ffmpeg
+            chmod +x desktop/bundle/runtime/node desktop/bundle/runtime/bin/yt-dlp desktop/bundle/runtime/bin/ffmpeg
+          fi
+      - name: Install Python dependencies and build worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -r worker/requirements.txt pyinstaller
+          python scripts/ensure-whisper-model.py
+          python -m PyInstaller --noconfirm --clean --onedir --name clipread-worker --paths . --collect-all whisper --collect-all tiktoken --noconsole worker/entrypoint.py
+          rm -rf desktop/bundle/runtime/clipread-worker
+          cp -R dist/clipread-worker desktop/bundle/runtime/clipread-worker
+      - name: Install JavaScript dependencies
+        run: npm ci
+      - name: Generate complete Tauri icons
+        run: npm run tauri:icons
+      - name: Run application checks
+        run: npm run check
+      - name: Prepare and validate desktop bundle
+        run: npm run desktop:runtime && npm run desktop:prepare && npm run desktop:validate
+      - name: Build Tauri installer
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: .
+          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+          releaseName: ${{ startsWith(github.ref, 'refs/tags/') && format('ClipRead {0}', github.ref_name) || '' }}
+          releaseBody: ${{ startsWith(github.ref, 'refs/tags/') && 'Bản build desktop tự chứa cho macOS và Windows.' || '' }}
+          releaseDraft: true
+          prerelease: false
+          args: --target ${{ matrix.target }}
