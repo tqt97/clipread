@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type UIEvent } from 'react';
 import { BookOpenText, Link2, LoaderCircle, Sparkles, Subtitles } from 'lucide-react';
 import { detectPlatform, toPlainText, toReadableParagraphs } from '@/domain/transcript';
-import { extractTranscriptInsights, searchTranscript } from '@/domain/insights';
-import { createSemanticSearchIndex } from '@/domain/semantic-search';
+import { extractTranscriptInsights } from '@/domain/insights';
 import {
   answerTranscriptQuestion,
   buildTranscriptChapters,
@@ -18,7 +17,12 @@ import { TranscriptSavedPanel } from './TranscriptSavedPanel';
 import { useClipboard } from './hooks/useClipboard';
 import { progressStages, useTranscriptExtraction } from './hooks/useTranscriptExtraction';
 import type { ViewMode } from './transcript-workbench-types';
+import { useTranscriptLibrary } from './hooks/useTranscriptLibrary';
+import { useTranscriptSearch } from './hooks/useTranscriptSearch';
 import { useDebouncedValue } from './hooks/useDebouncedValue';
+import { TranscriptLibraryPanel } from './TranscriptLibraryPanel';
+import { TranscriptWorkspaceActions } from './TranscriptWorkspaceActions';
+import { parseTranscriptWorkspace } from '@/domain/workspace';
 
 const downloadText = (content: string, filename: string, mime: string) => {
   const blob = new Blob([content], { type: `${mime};charset=utf-8` });
@@ -48,16 +52,24 @@ export const TranscriptWorkbench = () => {
   const [hydrated, setHydrated] = useState(false);
   const [url, setUrl] = useState('');
   const [language, setLanguage] = useState('auto');
-  const { document, error, loading, progressStage, elapsedSeconds, notice, setNotice, extract, cancel } =
+  const { document, error, loading, progressStage, elapsedSeconds, notice, setNotice, extract, cancel, loadDocument } =
     useTranscriptExtraction(url, language);
   const [readingProgress, setReadingProgress] = useState(0);
   const readerBodyRef = useRef<HTMLDivElement>(null);
   const readingProgressRef = useRef(0);
   const { copied, copyText } = useClipboard();
   const [viewMode, setViewMode] = useState<ViewMode>('read');
-  const [searchQuery, setSearchQuery] = useState('');
-  const debouncedSearchQuery = useDebouncedValue(searchQuery, 180);
-  const [activeSearchIndex, setActiveSearchIndex] = useState(0);
+  const {
+    query: searchQuery,
+    setQuery: setSearchQuery,
+    mode: searchMode,
+    setMode: setSearchMode,
+    debouncedQuery: debouncedSearchQuery,
+    results: visibleSearchResults,
+    semanticSearch: usesSemanticFallback,
+    activeIndex: activeSearchIndex,
+    setActiveIndex: setActiveSearchIndex,
+  } = useTranscriptSearch(document?.segments || []);
   const [activeSegmentId, setActiveSegmentId] = useState<number | null>(null);
   const segmentRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const [bookmarkedSegments, setBookmarkedSegments] = useState<number[]>([]);
@@ -66,6 +78,12 @@ export const TranscriptWorkbench = () => {
   const [question, setQuestion] = useState('');
   const debouncedQuestion = useDebouncedValue(question, 220);
   const storageHydratedRef = useRef(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const importedWorkspaceRef = useRef<{ sourceUrl: string; bookmarks: number[]; notes: Record<number, string> } | null>(
+    null,
+  );
+  const sharedLoadedRef = useRef(false);
+  const { entries: libraryEntries, save: saveLibrary, remove: removeLibrary } = useTranscriptLibrary();
 
   const platform = useMemo(() => detectPlatform(url), [url]);
   const paragraphs = useMemo(() => (document ? toReadableParagraphs(document.segments) : []), [document]);
@@ -86,20 +104,6 @@ export const TranscriptWorkbench = () => {
         : { confidence: 'low' as const, results: [] },
     [document, debouncedQuestion],
   );
-  const searchResults = useMemo(
-    () => (document ? searchTranscript(document.segments, debouncedSearchQuery) : []),
-    [document, debouncedSearchQuery],
-  );
-  const semanticSearchIndex = useMemo(
-    () => (document ? createSemanticSearchIndex(document.segments) : null),
-    [document],
-  );
-  const semanticResults = useMemo(
-    () => (semanticSearchIndex ? semanticSearchIndex.search(debouncedSearchQuery) : []),
-    [semanticSearchIndex, debouncedSearchQuery],
-  );
-  const usesSemanticFallback = searchResults.length === 0 && semanticResults.length > 0;
-  const visibleSearchResults = usesSemanticFallback ? semanticResults : searchResults;
   const wordCount = useMemo(
     () => paragraphs.reduce((count, paragraph) => count + (paragraph.match(/\S+/g)?.length || 0), 0),
     [paragraphs],
@@ -111,12 +115,26 @@ export const TranscriptWorkbench = () => {
   }, []);
 
   useEffect(() => {
+    const sharedUrl = new URLSearchParams(window.location.search).get('url');
+    if (sharedUrl && !sharedLoadedRef.current) {
+      sharedLoadedRef.current = true;
+      setUrl(sharedUrl);
+      void extract(sharedUrl);
+    }
+  }, [extract]);
+
+  useEffect(() => {
     setActiveSearchIndex(0);
     if (debouncedSearchQuery.trim() && visibleSearchResults.length > 0) {
       setViewMode('raw');
       setActiveSegmentId(visibleSearchResults[0].segmentId);
     }
-  }, [debouncedSearchQuery, visibleSearchResults]);
+  }, [debouncedSearchQuery, visibleSearchResults, setActiveSearchIndex]);
+
+  useEffect(() => {
+    if (!document) return;
+    if (!saveLibrary(document)) setNotice('Transcript quá lớn để lưu vào thư viện trên thiết bị này.');
+  }, [document, saveLibrary, setNotice]);
 
   useEffect(() => {
     if (!document) return;
@@ -159,6 +177,16 @@ export const TranscriptWorkbench = () => {
   useEffect(() => {
     if (!document) return;
     storageHydratedRef.current = false;
+    const imported = importedWorkspaceRef.current;
+    if (imported?.sourceUrl === document.sourceUrl) {
+      setBookmarkedSegments(imported.bookmarks);
+      setNotes(imported.notes);
+      importedWorkspaceRef.current = null;
+      storageHydratedRef.current = true;
+      setNoteDraft('');
+      setQuestion('');
+      return;
+    }
     const storageKey = `clipread:workspace:${document.sourceUrl}`;
     try {
       const saved = JSON.parse(window.localStorage.getItem(storageKey) || '{}') as {
@@ -202,7 +230,15 @@ export const TranscriptWorkbench = () => {
   const scrollToSegment = (segmentId: number) => {
     setViewMode('raw');
     setActiveSegmentId(segmentId);
-    window.history.replaceState(null, '', `#segment-${segmentId}`);
+    const query = document ? `?url=${encodeURIComponent(document.sourceUrl)}` : '';
+    window.history.replaceState(null, '', `${query}#segment-${segmentId}`);
+  };
+
+  const shareTranscript = async () => {
+    if (!document) return;
+    const link = `${window.location.origin}/?url=${encodeURIComponent(document.sourceUrl)}${activeSegmentId === null ? '' : `#segment-${activeSegmentId}`}`;
+    if (await copyText(link)) setNotice('Đã copy link transcript có thể chia sẻ.');
+    else setNotice('Không thể copy link. Hãy copy URL hiện tại trên thanh địa chỉ.');
   };
 
   const toggleBookmark = (segmentId: number) => {
@@ -280,6 +316,33 @@ export const TranscriptWorkbench = () => {
     downloadText(lines.join('\n'), `${base}-notes.md`, 'text/markdown');
   };
 
+  const exportWorkspace = () => {
+    if (!document) return;
+    downloadText(
+      JSON.stringify({ schemaVersion: 1, document, bookmarks: bookmarkedSegments, notes }, null, 2),
+      `${base}-workspace.json`,
+      'application/json',
+    );
+  };
+
+  const importWorkspace = async (file: File) => {
+    try {
+      const serialized = await file.text();
+      const value = parseTranscriptWorkspace(JSON.parse(serialized), serialized.length);
+      const importedBookmarks = value.bookmarks;
+      const importedNotes = value.notes as Record<number, string>;
+      importedWorkspaceRef.current = {
+        sourceUrl: value.document.sourceUrl,
+        bookmarks: importedBookmarks,
+        notes: importedNotes,
+      };
+      loadDocument(value.document);
+      setNotice('Đã nhập workspace trên thiết bị này.');
+    } catch {
+      setNotice('File workspace không hợp lệ hoặc không thể đọc.');
+    }
+  };
+
   const moveSearch = (direction: 1 | -1) => {
     if (visibleSearchResults.length === 0) return;
     const nextIndex = (activeSearchIndex + direction + visibleSearchResults.length) % visibleSearchResults.length;
@@ -342,7 +405,7 @@ export const TranscriptWorkbench = () => {
               <option value="en">English</option>
               <option value="ja">日本語</option>
             </select>
-            <button type="button" onClick={extract} disabled={!url.trim() || loading}>
+            <button type="button" onClick={() => void extract()} disabled={!url.trim() || loading}>
               {loading ? <LoaderCircle className="spin" size={18} /> : <BookOpenText size={18} />}
               {loading ? progress.label : 'Biến thành bài đọc'}
             </button>
@@ -356,7 +419,7 @@ export const TranscriptWorkbench = () => {
 
       <TranscriptFeedback
         error={error}
-        onRetry={extract}
+        onRetry={() => void extract()}
         loading={loading}
         progress={progress}
         elapsedSeconds={elapsedSeconds}
@@ -380,6 +443,14 @@ export const TranscriptWorkbench = () => {
             <b>→</b>
             <span>Xuất file</span>
           </div>
+          <TranscriptLibraryPanel
+            entries={libraryEntries}
+            onOpen={(entry) => {
+              setUrl(entry.sourceUrl);
+              setNotice('Đã chọn transcript gần đây. Bấm “Biến thành bài đọc” để tải lại.');
+            }}
+            onRemove={removeLibrary}
+          />
         </section>
       )}
 
@@ -404,6 +475,12 @@ export const TranscriptWorkbench = () => {
                 <dd>{document.segments.length}</dd>
               </div>
             </dl>
+            <TranscriptWorkspaceActions
+              inputRef={importInputRef}
+              onExport={exportWorkspace}
+              onImport={(file) => void importWorkspace(file)}
+              onShare={() => void shareTranscript()}
+            />
             <TranscriptKnowledgeCard
               summary={summary}
               chapters={chapters}
@@ -442,6 +519,8 @@ export const TranscriptWorkbench = () => {
             onSearchQueryChange={setSearchQuery}
             searchResults={visibleSearchResults}
             semanticSearch={usesSemanticFallback}
+            searchMode={searchMode}
+            onSearchModeChange={setSearchMode}
             onMoveSearch={moveSearch}
             readerBodyRef={readerBodyRef}
             onReaderScroll={handleReaderScroll}

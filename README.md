@@ -6,7 +6,7 @@ ClipRead là web app ưu tiên caption: người dùng dán đường dẫn vide
 
 ## Phạm vi MVP
 
-Đã có: URL YouTube công khai có caption, metadata, chế độ bài đọc, chế độ caption kèm timestamp, tìm kiếm lexical không dấu, gợi ý theo nội dung local, cụm từ khóa, summary trích xuất ngắn, action items, Q&A grounded, bookmark/notes local, copy, xuất `.md`/`.txt`/`.srt` và export knowledge `.md`. UI transcript dài dùng virtualized rendering.
+Đã có: URL YouTube công khai có caption, metadata, chế độ bài đọc, chế độ caption kèm timestamp, tìm kiếm chính xác hoặc gợi ý liên quan local, cụm từ khóa, summary trích xuất ngắn, action items, Q&A grounded, bookmark/notes local, đọc gần đây có giới hạn quota, import/export workspace có schema validation, share link tự tải, copy, xuất `.md`/`.txt`/`.srt` và export knowledge `.md`. UI transcript dài dùng virtualized rendering.
 
 TikTok và Facebook có pipeline thử nghiệm qua worker local khi `TRANSCRIPTION_WORKER_URL` đã cấu hình. Vì chưa có public URL regression matrix, chưa xem đây là production guarantee. Nếu chưa bật worker, API trả `PROVIDER_NOT_READY`.
 
@@ -69,6 +69,17 @@ npm run check
 `npm run check` chạy typecheck, lint, format check, domain tests, worker tests và production build.
 
 `npm run benchmark:transcript` đo lexical search trên 1k/5k/20k segments để kiểm tra regression hiệu năng trước khi thay bằng embedding model.
+
+`npm run evaluate:search` chạy bộ fixture nhỏ để đo recall minh bạch của lexical và TF-IDF ranking. Đây chưa phải benchmark accuracy production; muốn bật embedding model phải bổ sung tập đánh giá transcript thật đã ẩn dữ liệu nhạy cảm.
+
+Smoke public URL (chỉ chạy khi tự cấu hình URL test public):
+
+```bash
+CLIPREAD_BASE_URL=https://clipread-five.vercel.app \
+SMOKE_YOUTUBE_URL='https://...' \
+SMOKE_TIKTOK_URL='https://...' \
+npx tsx scripts/smoke-public-urls.ts
+```
 
 `npm run test:e2e` chạy Playwright trên production build local, dùng API fixture để kiểm tra flow UI mà không phụ thuộc YouTube/TikTok/Facebook.
 

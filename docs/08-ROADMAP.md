@@ -39,6 +39,7 @@
 - FFmpeg preprocessing.
 - Whisper local fallback.
 - Retry, dừng polling, cleanup và giới hạn tài nguyên.
+- Cancel process thật, deadline, heartbeat/stale recovery, dead-letter và SQLite backup.
 
 ## v0.6 — More Sources (experimental)
 
@@ -52,6 +53,12 @@
 - Full-text search.
 - Read later.
 - Optional account.
+
+## Chính sách reliability và scale
+
+- API transcript có sliding-window rate limit best-effort theo client IP; multi-instance production cần Redis hoặc rate limit ở edge.
+- SQLite hiện có lease/heartbeat cho một worker an toàn hơn; chỉ chuyển Redis khi cần nhiều worker đồng thời. Không thêm Redis chỉ vì “có thể scale”.
+- Semantic search thật chỉ bật sau khi benchmark accuracy/latency; TF-IDF local luôn là fallback minh bạch.
 
 ## Product north star
 

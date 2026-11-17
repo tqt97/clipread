@@ -114,10 +114,10 @@ Không commit thư mục `.vercel/` hoặc token.
 
 Repository → `Settings` → `Secrets and variables` → `Actions` → `New repository secret`:
 
-| Secret | Giá trị |
-|---|---|
-| `VERCEL_TOKEN` | Vercel personal token hoặc team token |
-| `VERCEL_ORG_ID` | `orgId` từ `.vercel/project.json` |
+| Secret              | Giá trị                               |
+| ------------------- | ------------------------------------- |
+| `VERCEL_TOKEN`      | Vercel personal token hoặc team token |
+| `VERCEL_ORG_ID`     | `orgId` từ `.vercel/project.json`     |
 | `VERCEL_PROJECT_ID` | `projectId` từ `.vercel/project.json` |
 
 Tạo repository variable tại tab `Variables`:
@@ -196,7 +196,7 @@ Quick Tunnel có URL thay đổi và phù hợp test, không phù hợp producti
 7. Trỏ `TRANSCRIPTION_WORKER_URL` tới domain HTTPS của worker.
 8. Kiểm tra `/health`, sau đó test TikTok và YouTube từ production.
 
-Worker hiện dùng SQLite bền vững, recovery job sau restart, rate limit submit và chỉ chạy một job đồng thời. Chưa có auto-scale, metrics đầy đủ hoặc multi-worker coordination; không mở public traffic lớn trước khi bổ sung các phần này.
+Worker hiện dùng SQLite bền vững, recovery job sau restart, deadline, heartbeat/stale recovery, cancel process, dead-letter, rate limit submit và chỉ chạy một job đồng thời. Metrics hiện là counter tối thiểu; chưa có multi-worker coordination.
 
 ## 5.3. Checklist kiểm tra đúng environment
 
@@ -247,7 +247,7 @@ Khi đặt sau reverse proxy/public network:
 - không ghi token vào access log;
 - kiểm tra `GET /health` trả JSON `{"status":"ok"}`.
 
-Worker hiện có SQLite persistence, recovery sau restart và rate limit cơ bản nhưng chưa tự scale hoặc có ownership/lease giữa nhiều worker. Không dùng cấu hình này cho public traffic lớn nếu chưa bổ sung coordination và monitoring.
+Worker hiện có SQLite persistence, recovery sau restart, cancel/deadline và rate limit cơ bản nhưng chưa tự scale hoặc có lease giữa nhiều worker. Không dùng cấu hình này cho public traffic lớn nếu chưa bổ sung coordination và monitoring.
 
 Worker cung cấp `GET /metrics` có auth để kiểm tra nhanh số job bắt đầu, hoàn tất, thất bại, retry và request bị rate limit. Đây là metrics tối thiểu, chưa thay thế Prometheus/OpenTelemetry.
 
@@ -302,7 +302,7 @@ Sau đó kiểm tra:
 
 - deploy worker Python;
 - test transcript với URL public thật;
-- migration/persistence vì MVP chưa có database;
+- Redis migration vì single-worker SQLite hiện đáp ứng phạm vi MVP;
 - monitoring/alerting và rate limit production.
 
 Đây là các hạng mục cần hoàn thiện trước khi mở public traffic lớn.

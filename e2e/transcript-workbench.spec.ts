@@ -35,6 +35,12 @@ test('user can create, search and bookmark a transcript', async ({ page }) => {
   await page.getByRole('button', { name: 'Caption gốc' }).click();
   await page.getByRole('search').getByLabel('Tìm trong transcript').fill('worker');
   await expect(page.getByRole('search').getByText('1 kết quả')).toBeVisible();
+  await expect(page.getByLabel('Chế độ tìm kiếm')).toHaveValue('exact');
+  await page.getByLabel('Chế độ tìm kiếm').selectOption('related');
+  await expect(page.getByLabel('Chế độ tìm kiếm')).toHaveValue('related');
+  await expect(page.getByRole('button', { name: 'Xuất workspace' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Nhập workspace' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Chia sẻ link' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Đánh dấu bookmark' }).first().click();
   await expect(page.locator('.reader-card').getByRole('button', { name: 'Bỏ bookmark' })).toBeVisible();
@@ -75,6 +81,13 @@ test('user can stop polling a queued worker job', async ({ page }) => {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ jobId: 'queued-demo', status: 'queued', stage: 'queued' }),
+    });
+  });
+  await page.route('**/api/transcript/jobs/queued-demo/cancel', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ jobId: 'queued-demo', status: 'cancelled', stage: 'cancelled' }),
     });
   });
 
@@ -118,6 +131,26 @@ test('mobile homepage keeps the input flow usable', async ({ page }) => {
   await expect(page.getByLabel('Đường dẫn video')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Biến thành bài đọc' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Một link vào. Một bài đọc ra.' })).toBeVisible();
+});
+
+test('share link auto-loads the transcript', async ({ page }) => {
+  await page.route('**/api/transcript', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        document: {
+          sourceUrl: 'https://www.youtube.com/watch?v=shared-demo',
+          platform: 'youtube',
+          title: 'Transcript được chia sẻ',
+          segments: [{ text: 'Nội dung chia sẻ', offset: 0, duration: 2 }],
+        },
+      }),
+    });
+  });
+
+  await page.goto(`/?url=${encodeURIComponent('https://www.youtube.com/watch?v=shared-demo')}`);
+  await expect(page.getByRole('heading', { name: 'Transcript được chia sẻ' })).toBeVisible();
 });
 
 test('long transcript keeps a bounded caption DOM window', async ({ page }) => {

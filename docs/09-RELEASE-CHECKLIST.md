@@ -6,6 +6,9 @@
 - [ ] `npm run test:domain` pass.
 - [ ] `npm run build` pass.
 - [ ] `npm run test:worker` pass.
+- [ ] `npm run test:provider` pass.
+- [ ] `npm run test:e2e` pass trên production build local.
+- [ ] `npm run benchmark:transcript` không có regression bất thường.
 - [ ] không còn debug logs không cần thiết.
 - [ ] error messages user-facing rõ ràng.
 
@@ -32,6 +35,9 @@
 - [ ] logs không chứa dữ liệu không cần thiết.
 - [ ] Worker remote có `WORKER_AUTH_TOKEN`.
 - [ ] Worker có giới hạn duration, queue và TTL job.
+- [ ] Worker có deadline, heartbeat/stale recovery và cancel endpoint.
+- [ ] Lỗi upstream 429 không retry mù.
+- [ ] SQLite backup đã tạo và kiểm tra file tồn tại.
 
 ## Deployment
 

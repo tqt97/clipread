@@ -10,10 +10,12 @@
     "lint": "eslint .",
     "format:check": "prettier --check \"app/**/*.{ts,tsx,css}\" \"components/**/*.{ts,tsx}\" \"domain/**/*.ts\" \"services/**/*.ts\" \"scripts/**/*.ts\" \"*.{mjs,json}\"",
     "test:worker": "python3 -m unittest discover -s worker -p 'test_*.py'",
-    "test:domain": "tsx --test domain/api.test.ts domain/insights.test.ts domain/knowledge.test.ts domain/semantic-search.test.ts",
+    "test:domain": "tsx --test domain/api.test.ts domain/insights.test.ts domain/knowledge.test.ts domain/semantic-search.test.ts domain/workspace.test.ts",
     "test:provider": "tsx --test services/youtube-transcript-provider.test.ts",
     "test:e2e": "playwright test",
     "benchmark:transcript": "tsx scripts/benchmark-transcript.ts",
+    "evaluate:search": "tsx scripts/evaluate-search.ts",
+    "smoke:public": "tsx scripts/smoke-public-urls.ts",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test:domain && npm run test:provider && npm run test:worker && npm run build"
   },
   "dependencies": {

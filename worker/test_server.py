@@ -1,8 +1,14 @@
 import json
+import queue
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from worker.captions import parse_caption, parse_timestamped_caption
 from worker.platforms import platform_for
+from worker.retry_policy import RETRYABLE_JOB_ERRORS
+from worker.transcriber import run_command, transcribe_with_cancel
 
 
 class CaptionParserTests(unittest.TestCase):
@@ -49,6 +55,26 @@ class CaptionParserTests(unittest.TestCase):
         content = """WEBVTT\n\n00:01.000 --> 00:03.500\nShort timestamp\n"""
 
         self.assertEqual(parse_caption(content, "vtt", "en")[0]["duration"], 2.5)
+
+    def test_upstream_rate_limit_is_not_retried_blindly(self):
+        self.assertNotIn("UPSTREAM_RATE_LIMITED", RETRYABLE_JOB_ERRORS)
+
+    def test_command_reads_large_stderr_without_deadlocking(self):
+        with TemporaryDirectory() as directory:
+            script = Path(directory) / "emit.py"
+            script.write_text("import sys; sys.stderr.write('x' * 2000000); print('ok')")
+            output = run_command(["python3", str(script)])
+        self.assertEqual(output.strip(), "ok")
+
+    def test_whisper_queue_failure_is_a_worker_error(self):
+        with patch("worker.transcriber.Process") as process_class, patch("worker.transcriber.Queue") as queue_class:
+            process = process_class.return_value
+            process.is_alive.return_value = False
+            process.exitcode = 1
+            queue_class.return_value.get.side_effect = queue.Empty
+            with self.assertRaises(Exception) as context:
+                transcribe_with_cancel("audio.wav", "vi", "base")
+        self.assertEqual(getattr(context.exception, "code", None), "WHISPER_FAILED")
 
 
 if __name__ == "__main__":

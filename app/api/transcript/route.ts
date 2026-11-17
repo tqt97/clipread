@@ -3,6 +3,7 @@ import { apiError } from '@/domain/api';
 import { detectPlatform, isHttpUrl } from '@/domain/transcript';
 import { findTranscriptProvider } from '@/services/transcript-providers';
 import { YouTubeProviderError } from '@/services/youtube-transcript-provider';
+import { allowTranscriptRequest, requestClientKey } from '@/services/api-rate-limit';
 import {
   isTranscriptionWorkerConfigured,
   submitTranscriptionJob,
@@ -13,6 +14,11 @@ export const runtime = 'nodejs';
 export const maxDuration = 30;
 
 export async function POST(request: Request) {
+  if (!allowTranscriptRequest(requestClientKey(request))) {
+    return NextResponse.json(apiError('API_RATE_LIMITED', 'Bạn gửi quá nhiều yêu cầu. Hãy đợi một lát rồi thử lại.'), {
+      status: 429,
+    });
+  }
   let body: { url?: unknown; language?: unknown };
   let url = '';
   let language: string | undefined;

@@ -7,15 +7,19 @@ import os
 import sys
 import tempfile
 import time
+import signal
+import threading
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .captions import caption_candidates, caption_extension, fetch_caption, parse_caption
-from .errors import WorkerError
+from .errors import JobCancelled, JobDeadlineExceeded, WorkerError
 from .job_store import JobStore
 from .metrics import Metrics
 from .platforms import platform_for
 from .rate_limiter import RateLimiter
+from .retry_policy import RETRYABLE_JOB_ERRORS
 from .transcriber import run_command, transcribe_audio
 
 YTDLP = os.getenv("YTDLP_BINARY", "yt-dlp")
@@ -25,6 +29,8 @@ WORKER_AUTH_TOKEN = os.getenv("WORKER_AUTH_TOKEN", "").strip()
 MAX_VIDEO_DURATION_SECONDS = int(os.getenv("MAX_VIDEO_DURATION_SECONDS", "7200"))
 MAX_CAPTION_BYTES = int(os.getenv("MAX_CAPTION_BYTES", str(5 * 1024 * 1024)))
 MAX_JOB_ATTEMPTS = int(os.getenv("MAX_JOB_ATTEMPTS", "2"))
+JOB_DEADLINE_SECONDS = int(os.getenv("JOB_DEADLINE_SECONDS", "900"))
+JOB_STALE_SECONDS = int(os.getenv("JOB_STALE_SECONDS", "120"))
 JOB_STORE = JobStore(
     ttl_seconds=int(os.getenv("JOB_TTL_SECONDS", "3600")),
     max_jobs=int(os.getenv("MAX_JOBS", "100")),
@@ -36,40 +42,54 @@ SUBMISSION_RATE_LIMITER = RateLimiter(
 )
 EXECUTOR = ThreadPoolExecutor(max_workers=1)
 METRICS = Metrics()
+HTTP_SERVER = None
+SHUTDOWN_EVENT = threading.Event()
+ACTIVE_JOB_IDS = set()
+ACTIVE_JOB_LOCK = threading.Lock()
 
 
-def fetch_info(url):
+def fetch_info(url, should_cancel=None, deadline=None):
     output = run_command([
         YTDLP, "--dump-single-json", "--skip-download", "--no-playlist", "--no-warnings", "--retries", "3", url,
-    ])
+    ], should_cancel, deadline)
     try:
         return json.loads(output)
     except json.JSONDecodeError as error:
         raise WorkerError("INVALID_UPSTREAM_RESPONSE", "Nguồn video trả về dữ liệu không hợp lệ.") from error
 
 
-RETRYABLE_JOB_ERRORS = {
-    "COMMAND_TIMEOUT",
-    "INVALID_UPSTREAM_RESPONSE",
-    "UPSTREAM_COMMAND_FAILED",
-    "UPSTREAM_RATE_LIMITED",
-}
-
-
 def process_job(job_id, url, language, attempt=1):
+    started_at = time.monotonic()
+    lease_token = uuid.uuid4().hex
+    if not JOB_STORE.claim(job_id, lease_token):
+        return
+    with ACTIVE_JOB_LOCK:
+        ACTIVE_JOB_IDS.add(job_id)
+    deadline = time.time() + JOB_DEADLINE_SECONDS
+    should_cancel = lambda: SHUTDOWN_EVENT.is_set() or JOB_STORE.is_cancel_requested(job_id)
+    heartbeat_stop = threading.Event()
+    def heartbeat():
+        while not heartbeat_stop.wait(5):
+            JOB_STORE.heartbeat(job_id, lease_token)
+    heartbeat_thread = threading.Thread(target=heartbeat, daemon=True)
+    heartbeat_thread.start()
     METRICS.increment("jobs_started")
-    JOB_STORE.update(job_id, status="running", stage="fetching_metadata")
+    JOB_STORE.update(job_id, lease_token=lease_token, status="running", stage="fetching_metadata", attempt=attempt, deadlineAt=deadline)
     try:
+        if should_cancel():
+            raise JobCancelled()
         with tempfile.TemporaryDirectory(prefix="clipread-") as temp_dir:
-            info = fetch_info(url)
+            info = fetch_info(url, should_cancel, deadline)
             duration = float(info.get("duration") or 0)
             if duration > MAX_VIDEO_DURATION_SECONDS:
                 raise WorkerError("VIDEO_TOO_LONG", "Video vượt quá thời lượng cho phép.")
 
-            JOB_STORE.update(job_id, stage="checking_captions")
+            JOB_STORE.update(job_id, lease_token=lease_token, stage="checking_captions")
             segments = []
             detected_language = None
             for caption_language, caption in caption_candidates(info, language):
+                if should_cancel():
+                    raise JobCancelled()
                 try:
                     content = fetch_caption(caption, MAX_CAPTION_BYTES, url)
                     segments = parse_caption(content, caption_extension(caption), caption_language)
@@ -80,21 +100,25 @@ def process_job(job_id, url, language, attempt=1):
                     break
 
             if not segments:
-                JOB_STORE.update(job_id, stage="downloading_audio")
+                JOB_STORE.update(job_id, lease_token=lease_token, stage="downloading_audio")
                 segments, detected_language = transcribe_audio(
                     url,
                     language,
                     temp_dir,
-                    lambda stage: JOB_STORE.update(job_id, stage=stage),
+                    lambda stage: JOB_STORE.update(job_id, lease_token=lease_token, stage=stage),
                     YTDLP,
                     FFMPEG,
                     WHISPER_MODEL,
                     MAX_VIDEO_DURATION_SECONDS,
+                    should_cancel,
+                    deadline,
                 )
+            if should_cancel():
+                raise JobCancelled()
             if not segments:
                 raise WorkerError("NO_TRANSCRIPT", "Không tạo được transcript từ caption hoặc audio.")
 
-            JOB_STORE.update(job_id, stage="finalizing")
+            JOB_STORE.update(job_id, lease_token=lease_token, stage="finalizing")
             document = {
                 "sourceUrl": url,
                 "platform": platform_for(url),
@@ -105,23 +129,37 @@ def process_job(job_id, url, language, attempt=1):
                 "thumbnail": info.get("thumbnail"),
                 "segments": segments,
             }
-        JOB_STORE.update(job_id, status="completed", stage="completed", document=document)
+        JOB_STORE.update(job_id, lease_token=lease_token, status="completed", stage="completed", document=document)
         METRICS.increment("jobs_completed")
     except WorkerError as error:
         print(f"[worker] job failed: {error.code} - {error}", file=sys.stderr)
-        if error.code in RETRYABLE_JOB_ERRORS and attempt < MAX_JOB_ATTEMPTS:
+        if error.code == "JOB_CANCELLED":
+            JOB_STORE.update(job_id, lease_token=lease_token, status="cancelled", stage="cancelled", error=str(error), code=error.code)
+            METRICS.increment("jobs_cancelled")
+        elif error.code in RETRYABLE_JOB_ERRORS and attempt < MAX_JOB_ATTEMPTS:
             METRICS.increment("jobs_retried")
             retry_delay = min(30, 2 ** attempt)
-            JOB_STORE.update(job_id, status="queued", stage="queued", retryCount=attempt)
+            JOB_STORE.update(job_id, lease_token=lease_token, status="queued", stage="queued", retryCount=attempt, attempt=attempt + 1)
             time.sleep(retry_delay)
             EXECUTOR.submit(process_job, job_id, url, language, attempt + 1)
             return
-        JOB_STORE.update(job_id, status="failed", error=str(error), code=error.code)
+        if error.code == "JOB_TIMEOUT":
+            JOB_STORE.update(job_id, lease_token=lease_token, status="failed", stage="failed", error=str(error), code=error.code)
+        elif attempt >= MAX_JOB_ATTEMPTS and error.code in RETRYABLE_JOB_ERRORS:
+            JOB_STORE.update(job_id, lease_token=lease_token, status="dead_letter", stage="dead_letter", error=str(error), code=error.code, deadLetter=True)
+        else:
+            JOB_STORE.update(job_id, lease_token=lease_token, status="failed", error=str(error), code=error.code)
         METRICS.increment("jobs_failed")
     except Exception as error:
         print(f"[worker] unexpected job failure: {type(error).__name__}: {error}", file=sys.stderr)
-        JOB_STORE.update(job_id, status="failed", error="Worker gặp lỗi không mong muốn.", code="WORKER_ERROR")
+        JOB_STORE.update(job_id, lease_token=lease_token, status="failed", error="Worker gặp lỗi không mong muốn.", code="WORKER_ERROR")
         METRICS.increment("jobs_failed")
+    finally:
+        METRICS.observe("jobDuration", (time.monotonic() - started_at) * 1000)
+        heartbeat_stop.set()
+        heartbeat_thread.join(timeout=1)
+        with ACTIVE_JOB_LOCK:
+            ACTIVE_JOB_IDS.discard(job_id)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -145,6 +183,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self.authorized():
             self.send_json({"error": "Worker authentication required.", "code": "UNAUTHORIZED"}, 401)
+            return
+        if self.path.startswith("/jobs/") and self.path.endswith("/cancel"):
+            job_id = self.path.removeprefix("/jobs/").removesuffix("/cancel").strip("/")
+            job = JOB_STORE.request_cancel(job_id)
+            self.send_json(job or {"error": "Job không tồn tại hoặc đã hết hạn.", "code": "JOB_NOT_FOUND"}, 202 if job else 404)
             return
         if self.path != "/jobs":
             self.send_json({"error": "Not found", "code": "NOT_FOUND"}, 404)
@@ -201,9 +244,10 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def recover_pending_jobs():
+    JOB_STORE.recover_stale(JOB_STALE_SECONDS)
     for job in JOB_STORE.pending_jobs():
         JOB_STORE.update(job["jobId"], status="queued", stage="queued")
-        EXECUTOR.submit(process_job, job["jobId"], job["url"], job["language"])
+        EXECUTOR.submit(process_job, job["jobId"], job["url"], job["language"], job.get("attempt", 1))
 
 
 if __name__ == "__main__":
@@ -212,4 +256,17 @@ if __name__ == "__main__":
         raise SystemExit("WORKER_AUTH_TOKEN is required when HOST is not local.")
     port = int(os.getenv("PORT", "8787"))
     recover_pending_jobs()
-    ThreadingHTTPServer((host, port), Handler).serve_forever()
+    HTTP_SERVER = ThreadingHTTPServer((host, port), Handler)
+    def shutdown(_signal, _frame):
+        SHUTDOWN_EVENT.set()
+        with ACTIVE_JOB_LOCK:
+            for job_id in list(ACTIVE_JOB_IDS):
+                JOB_STORE.request_cancel(job_id)
+        threading.Thread(target=HTTP_SERVER.shutdown, daemon=True).start()
+    signal.signal(signal.SIGINT, shutdown)
+    signal.signal(signal.SIGTERM, shutdown)
+    try:
+        HTTP_SERVER.serve_forever()
+    finally:
+        EXECUTOR.shutdown(wait=True, cancel_futures=False)
+        JOB_STORE.close()

@@ -14,7 +14,8 @@ export type TranscriptApiErrorCode =
   | 'VIDEO_TOO_LONG'
   | 'JOB_NOT_FOUND'
   | 'QUEUE_FULL'
-  | 'UPSTREAM_ERROR';
+  | 'UPSTREAM_ERROR'
+  | 'API_RATE_LIMITED';
 
 export interface TranscriptApiError {
   error: string;
@@ -110,6 +111,11 @@ export const presentTranscriptError = (
     WORKER_RATE_LIMITED: {
       title: 'Worker đang giới hạn yêu cầu',
       message: 'Có quá nhiều yêu cầu trong thời gian ngắn. Hãy đợi một lát rồi thử lại.',
+      retryable: true,
+    },
+    API_RATE_LIMITED: {
+      title: 'Bạn gửi hơi nhanh',
+      message: 'ClipRead đang giới hạn số lần xử lý trong thời gian ngắn. Hãy đợi một lát rồi thử lại.',
       retryable: true,
     },
     VIDEO_TOO_LONG: {

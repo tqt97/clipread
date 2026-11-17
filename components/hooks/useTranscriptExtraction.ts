@@ -75,6 +75,7 @@ export const useTranscriptExtraction = (url: string, language: string) => {
   const [notice, setNotice] = useState<string | null>(null);
   const pollingAbortRef = useRef<AbortController | null>(null);
   const pollingCancelledRef = useRef(false);
+  const activeJobIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!loading) {
@@ -88,7 +89,7 @@ export const useTranscriptExtraction = (url: string, language: string) => {
 
   useEffect(() => () => pollingAbortRef.current?.abort(), []);
 
-  const extract = async () => {
+  const extract = async (requestedUrl = url) => {
     const controller = new AbortController();
     pollingAbortRef.current?.abort();
     pollingAbortRef.current = controller;
@@ -102,18 +103,19 @@ export const useTranscriptExtraction = (url: string, language: string) => {
       const response = await fetch('/api/transcript', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim(), language }),
+        body: JSON.stringify({ url: requestedUrl.trim(), language }),
         signal: controller.signal,
       });
       const payload = (await response.json()) as TranscriptionJobResponse & { error?: string; code?: string };
       if (!response.ok) throw new TranscriptClientError(payload.code, payload.error);
 
       if (response.status === 202 && payload.jobId) {
+        activeJobIdRef.current = payload.jobId;
         let job = payload;
         setProgressStage(normalizeTranscriptionJobStage(job.stage));
         const deadline = Date.now() + POLL_TIMEOUT_MS;
         let pollDelay = INITIAL_POLL_DELAY_MS;
-        while (job.status === 'queued' || job.status === 'running') {
+        while (job.status === 'queued' || job.status === 'running' || job.status === 'cancel_requested') {
           if (Date.now() >= deadline) throw new Error('TRANSCRIPTION_TIMEOUT');
           await waitFor(pollDelay, controller.signal);
           const statusResponse = await fetch(`/api/transcript/jobs/${encodeURIComponent(job.jobId)}`, {
@@ -127,7 +129,12 @@ export const useTranscriptExtraction = (url: string, language: string) => {
           );
           pollDelay = Math.min(MAX_POLL_DELAY_MS, Math.round(pollDelay * 1.5));
         }
-        if (job.status === 'failed' || !job.document) throw new TranscriptClientError(job.code, job.error);
+        if (job.status === 'cancelled') {
+          setNotice('Đã dừng xử lý job trên worker.');
+          return;
+        }
+        if (job.status === 'failed' || job.status === 'dead_letter' || !job.document)
+          throw new TranscriptClientError(job.code, job.error);
         setProgressStage('completed');
         setDocument(job.document);
       } else if (payload.document) {
@@ -145,16 +152,46 @@ export const useTranscriptExtraction = (url: string, language: string) => {
       else setError(presentTranscriptError());
     } finally {
       if (pollingAbortRef.current === controller) pollingAbortRef.current = null;
+      activeJobIdRef.current = null;
       setLoading(false);
     }
   };
 
-  const cancel = () => {
+  const cancel = async () => {
     pollingCancelledRef.current = true;
+    const jobId = activeJobIdRef.current;
     pollingAbortRef.current?.abort();
     setLoading(false);
-    setNotice('Đã dừng theo dõi job. Worker có thể vẫn đang xử lý ở phía sau.');
+    if (jobId) {
+      const cancelController = new AbortController();
+      const timer = window.setTimeout(() => cancelController.abort(), 5000);
+      try {
+        const response = await fetch(`/api/transcript/jobs/${encodeURIComponent(jobId)}/cancel`, {
+          method: 'POST',
+          signal: cancelController.signal,
+        });
+        if (!response.ok) throw new Error('CANCEL_REQUEST_FAILED');
+        setNotice('Đã dừng theo dõi job và worker đã nhận yêu cầu dừng.');
+      } catch {
+        setNotice('Không gửi được yêu cầu dừng tới worker; đã dừng theo dõi ở trình duyệt.');
+      } finally {
+        window.clearTimeout(timer);
+      }
+    } else {
+      setNotice('Đã dừng xử lý.');
+    }
   };
 
-  return { document, error, loading, progressStage, elapsedSeconds, notice, setNotice, extract, cancel };
+  return {
+    document,
+    error,
+    loading,
+    progressStage,
+    elapsedSeconds,
+    notice,
+    setNotice,
+    extract,
+    cancel,
+    loadDocument: setDocument,
+  };
 };

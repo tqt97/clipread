@@ -29,6 +29,12 @@ Metrics tối thiểu (cần token nếu worker bật auth):
 curl -H "Authorization: Bearer $WORKER_AUTH_TOKEN" http://127.0.0.1:8787/metrics
 ```
 
+Backup SQLite trước khi nâng cấp hoặc restart máy:
+
+```bash
+python3 -m worker.backup worker/data/jobs-$(date +%Y%m%d-%H%M%S).sqlite3
+```
+
 Trong terminal chạy Next.js:
 
 ```bash
@@ -57,10 +63,14 @@ WHISPER_MODEL=small  # tốt hơn nhưng chậm/nặng hơn
 
 ## Giới hạn MVP
 
-- Job state được lưu trong SQLite tại `JOB_DB_PATH` (mặc định `worker/data/jobs.sqlite3`); restart worker có thể khôi phục job đang chờ.
+- Job state được lưu trong SQLite tại `JOB_DB_PATH` (mặc định `worker/data/jobs.sqlite3`); restart worker có thể khôi phục job đang chờ và job stale, đồng thời giữ nguyên `attempt`.
+- Mỗi job có deadline `JOB_DEADLINE_SECONDS`, heartbeat và stale recovery sau `JOB_STALE_SECONDS`.
+- Job đang chạy có lease token ngắn hạn; heartbeat gia hạn lease để tránh hai worker xử lý trùng cùng một job.
+- `POST /jobs/{jobId}/cancel` gửi yêu cầu dừng thật; yt-dlp, FFmpeg và tiến trình Whisper con sẽ bị terminate.
+- Job mutation khi đang chạy có lease fencing; worker cũ không được phép ghi đè kết quả worker mới.
 - Chỉ chạy một job cùng lúc và giới hạn thêm một job đang chờ để không làm máy quá tải.
 - Job hoàn tất/lỗi được dọn sau `JOB_TTL_SECONDS`.
-- Submit cùng URL và ngôn ngữ sẽ dùng lại job đang chạy/đã hoàn tất trong TTL; upstream failure có retry giới hạn bởi `MAX_JOB_ATTEMPTS`.
+- Submit cùng URL và ngôn ngữ sẽ dùng lại job đang chạy/đã hoàn tất trong TTL; upstream failure retry giới hạn bởi `MAX_JOB_ATTEMPTS`, riêng lỗi 429 không retry mù.
 - Worker giới hạn số lần submit theo client bằng `MAX_SUBMISSIONS_PER_WINDOW` và `SUBMISSION_WINDOW_SECONDS`.
 - Worker nên chạy local hoặc trong mạng riêng; không expose trực tiếp ra Internet.
 - Chỉ xử lý URL/nội dung mà người dùng có quyền truy cập và sử dụng.

@@ -1,6 +1,7 @@
 import type { TranscriptDocument } from './transcript';
 
-export type TranscriptionJobStatus = 'queued' | 'running' | 'completed' | 'failed';
+export type TranscriptionJobStatus =
+  'queued' | 'running' | 'cancel_requested' | 'cancelled' | 'completed' | 'failed' | 'dead_letter';
 export type TranscriptionJobStage =
   | 'queued'
   | 'fetching_metadata'

@@ -66,3 +66,22 @@ export const getTranscriptionJob = async (jobId: string, signal?: AbortSignal): 
   }
   return response.json() as Promise<TranscriptionJobResponse>;
 };
+
+export const cancelTranscriptionJob = async (
+  jobId: string,
+  signal?: AbortSignal,
+): Promise<TranscriptionJobResponse> => {
+  if (!workerUrl) throw new Error('TRANSCRIPTION_WORKER_NOT_CONFIGURED');
+  const response = await fetch(`${workerUrl}/jobs/${encodeURIComponent(jobId)}/cancel`, {
+    method: 'POST',
+    headers: workerHeaders(),
+    signal: requestSignal(signal),
+  });
+  const payload = (await response.json().catch(() => ({}))) as TranscriptionJobResponse & {
+    error?: string;
+    code?: string;
+  };
+  if (!response.ok)
+    throw new TranscriptionWorkerError(response.status, payload.error || 'Không thể dừng job.', payload.code);
+  return payload;
+};

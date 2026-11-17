@@ -20,6 +20,8 @@ interface TranscriptReaderProps {
   onSearchQueryChange: (query: string) => void;
   searchResults: TranscriptSearchResult[];
   semanticSearch: boolean;
+  searchMode: 'exact' | 'related';
+  onSearchModeChange: (mode: 'exact' | 'related') => void;
   onMoveSearch: (direction: 1 | -1) => void;
   readerBodyRef: RefObject<HTMLDivElement | null>;
   onReaderScroll: (event: UIEvent<HTMLDivElement>) => void;
@@ -50,6 +52,8 @@ export const TranscriptReader = ({
   onSearchQueryChange,
   searchResults,
   semanticSearch,
+  searchMode,
+  onSearchModeChange,
   onMoveSearch,
   readerBodyRef,
   onReaderScroll,
@@ -134,6 +138,14 @@ export const TranscriptReader = ({
             ? `${searchResults.length} ${semanticSearch ? 'gợi ý theo nội dung' : 'kết quả'}`
             : 'Tìm kiếm'}
         </span>
+        <select
+          value={searchMode}
+          onChange={(event) => onSearchModeChange(event.target.value as 'exact' | 'related')}
+          aria-label="Chế độ tìm kiếm"
+        >
+          <option value="exact">Khớp chính xác</option>
+          <option value="related">Gợi ý liên quan</option>
+        </select>
         <button
           type="button"
           onClick={() => onMoveSearch(-1)}

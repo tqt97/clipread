@@ -44,7 +44,7 @@ class JobStoreTests(unittest.TestCase):
 
         self.assertEqual(
             store.pending_jobs(),
-            [{"jobId": job["jobId"], "url": "https://www.youtube.com/watch?v=demo", "language": "en"}],
+            [{"jobId": job["jobId"], "url": "https://www.youtube.com/watch?v=demo", "language": "en", "attempt": 1}],
         )
 
     def test_create_is_idempotent_for_an_active_or_completed_job(self):
@@ -56,6 +56,73 @@ class JobStoreTests(unittest.TestCase):
 
         self.assertEqual(duplicate["jobId"], first["jobId"])
         self.assertEqual(completed_duplicate["jobId"], first["jobId"])
+
+    def test_cancel_marks_job_without_deleting_history(self):
+        store = JobStore()
+        job = store.create("https://www.youtube.com/watch?v=cancel", "auto")
+        cancelled = store.request_cancel(job["jobId"])
+
+        self.assertEqual(cancelled["status"], "cancelled")
+        self.assertTrue(store.is_cancel_requested(job["jobId"]))
+        self.assertEqual(store.get(job["jobId"])["jobId"], job["jobId"])
+
+    def test_stale_running_job_is_requeued(self):
+        store = JobStore()
+        job = store.create("https://www.youtube.com/watch?v=stale", "auto")
+        store.update(job["jobId"], status="running", heartbeatAt=0)
+
+        recovered = store.recover_stale(stale_seconds=1)
+
+        self.assertEqual(recovered[0]["jobId"], job["jobId"])
+        self.assertEqual(store.get(job["jobId"])["status"], "queued")
+
+    def test_backup_contains_job_state(self):
+        with TemporaryDirectory() as directory:
+            source = f"{directory}/jobs.sqlite3"
+            target = f"{directory}/backup.sqlite3"
+            store = JobStore(db_path=source)
+            job = store.create("https://www.youtube.com/watch?v=backup", "auto")
+            store.backup(target)
+            restored_store = JobStore(db_path=target)
+            restored = restored_store.get(job["jobId"])
+            self.assertEqual(restored["jobId"], job["jobId"])
+            restored_store.close()
+            store.close()
+
+    def test_lease_prevents_two_workers_claiming_same_job(self):
+        store = JobStore()
+        job = store.create()
+        self.assertTrue(store.claim(job["jobId"], "worker-a", lease_seconds=60))
+        self.assertFalse(store.claim(job["jobId"], "worker-b", lease_seconds=60))
+        store.close()
+
+    def test_fenced_update_rejects_stale_worker(self):
+        store = JobStore()
+        job = store.create()
+        self.assertTrue(store.claim(job["jobId"], "worker-a", lease_seconds=60))
+        self.assertFalse(store.update(job["jobId"], lease_token="worker-b", status="completed"))
+        self.assertTrue(store.update(job["jobId"], lease_token="worker-a", status="completed"))
+        self.assertEqual(store.get(job["jobId"])["status"], "completed")
+
+    def test_cancelled_job_is_not_requeued_after_restart(self):
+        store = JobStore()
+        job = store.create()
+        cancelled = store.request_cancel(job["jobId"])
+        self.assertEqual(cancelled["status"], "cancelled")
+        self.assertEqual(store.pending_jobs(), [])
+
+    def test_recovery_preserves_attempt_and_recovers_cancel_requested(self):
+        store = JobStore()
+        job = store.create()
+        store.update(job["jobId"], attempt=2, status="running", heartbeatAt=0)
+        recovered = store.recover_stale(stale_seconds=1)
+        self.assertEqual(recovered[0]["attempt"], 2)
+        cancel_job = store.create("https://example.com/cancel", "auto")
+        store.update(cancel_job["jobId"], status="running", heartbeatAt=0)
+        store.request_cancel(cancel_job["jobId"])
+        store.recover_stale(stale_seconds=1)
+        self.assertEqual(recovered[0], {"jobId": job["jobId"], "url": "", "language": "auto", "attempt": 2})
+        self.assertEqual(store.get(cancel_job["jobId"])["status"], "cancelled")
 
 
 class RateLimiterTests(unittest.TestCase):

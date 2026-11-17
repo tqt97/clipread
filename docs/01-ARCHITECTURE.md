@@ -92,9 +92,9 @@ Web/API → tạo job → queue → worker → lấy audio tạm
        → normalize → STT → TranscriptDocument → lưu kết quả tạm → client
 ```
 
-Worker cần timeout, retry, cancellation, cleanup, giới hạn tài nguyên và idempotency riêng.
+Worker cần deadline, retry có phân loại lỗi, cancellation, cleanup, giới hạn tài nguyên và idempotency riêng.
 
-Các phần timeout, retry giới hạn, cleanup, idempotency URL/ngôn ngữ và SQLite persistence hiện đã có ở mức local MVP; cancellation hiện dừng polling phía client, không hủy process Whisper đang chạy.
+Các phần deadline, retry giới hạn, cleanup, idempotency URL/ngôn ngữ, cancel process, heartbeat/stale recovery và SQLite persistence hiện đã có ở mức local MVP.
 
 Worker hiện đã có SQLite job state, recovery sau restart, rate limit submit và một job mỗi lần, cùng `yt-dlp`, FFmpeg và Whisper local. Đây vẫn là lựa chọn tiết kiệm chi phí cho máy cá nhân; chưa phải hệ thống production auto-scale nhiều worker.
 

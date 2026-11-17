@@ -54,10 +54,10 @@ Chưa tách `lib/`, `utils/` hoặc database. Worker đã là một module riên
 
 ## Rủi ro còn lại
 
-- Worker parser đã có automated test; vẫn chưa có test JS/API integration, browser E2E hoặc fixture URL public ổn định.
-- Worker hiện là MVP local/remote có token, SQLite job state, recovery sau restart, rate limit submit, một job mỗi lần và TTL cleanup.
+- Worker parser/job-store/transcriber đã có automated test; browser E2E có fixture cho cancel, share link, accessibility và transcript dài. Public URL matrix vẫn cần chạy riêng.
+- Worker hiện là MVP local/remote có token, SQLite job state, attempt persistence, lease fencing, cancel recovery, rate limit submit, một job mỗi lần và TTL cleanup.
 - Error mapping vẫn dựa một phần vào message từ thư viện upstream/worker; nên chuyển sang error type riêng khi provider có thể phân biệt nguyên nhân ổn định.
-- API chưa có observability đầy đủ; worker remote có auth và rate limit cơ bản nhưng vẫn phù hợp MVP cá nhân, chưa đủ cho public scale.
+- API có rate limit best-effort theo instance; worker có metrics counter/timing tối thiểu. Vẫn phù hợp MVP cá nhân, chưa đủ cho public multi-instance scale.
 - `maxDuration = 30` là cấu hình source, chưa phải bằng chứng deployment thực tế đã nhận đúng cấu hình.
 - Chưa kiểm chứng byte output, caption track thực tế, rate limit YouTube hoặc hành vi production.
 - YouTube provider dùng cache in-memory theo warm instance và không retry mù khi `429`; Vercel vẫn có thể bị giới hạn theo IP datacenter, khi đó cần worker remote.
