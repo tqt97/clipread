@@ -16,7 +16,14 @@
     "benchmark:transcript": "tsx scripts/benchmark-transcript.ts",
     "evaluate:search": "tsx scripts/evaluate-search.ts",
     "smoke:public": "tsx scripts/smoke-public-urls.ts",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test:domain && npm run test:provider && npm run test:worker && npm run build"
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test:domain && npm run test:provider && npm run test:worker && npm run build",
+    "desktop:prepare": "node scripts/prepare-desktop.mjs",
+    "desktop:runtime": "node scripts/prepare-desktop-runtime.mjs",
+    "desktop:model": "python3 scripts/ensure-whisper-model.py",
+    "desktop:validate": "node scripts/validate-desktop-bundle.mjs",
+    "tauri:icons": "tauri icon src-tauri/icons/icon.svg",
+    "tauri:build": "tauri build",
+    "tauri:dev": "tauri dev"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.14.26",
@@ -30,6 +37,7 @@
     "@axe-core/playwright": "^4.14.0",
     "@eslint/js": "^9.39.5",
     "@playwright/test": "^1.65.1",
+    "@tauri-apps/cli": "^2.8.4",
     "@types/node": "^24.10.0",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
