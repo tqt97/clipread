@@ -43,6 +43,7 @@ export const TranscriptKnowledgeCard = ({
         <Download size={14} /> Xuất
       </button>
     </div>
+    <p className="knowledge-note">Trích xuất trực tiếp từ transcript · không gọi AI.</p>
     <h3>Tóm tắt</h3>
     {summary.length > 0 ? (
       <p className="summary-paragraph">{summary.map((item) => item.text).join(' ')}</p>
@@ -117,7 +118,7 @@ export const TranscriptKnowledgeCard = ({
     )}
     <div className="qa-box">
       <label htmlFor="transcript-question">
-        <MessageCircleQuestion size={14} /> Hỏi transcript
+        <MessageCircleQuestion size={14} /> Tìm câu trả lời trong transcript
       </label>
       <input
         id="transcript-question"
@@ -128,7 +129,7 @@ export const TranscriptKnowledgeCard = ({
       {question.trim() && (
         <div className="qa-answer">
           <small>
-            Độ tin cậy: {answer.confidence === 'high' ? 'cao' : answer.confidence === 'medium' ? 'vừa' : 'thấp'}
+            Mức khớp: {answer.confidence === 'high' ? 'cao' : answer.confidence === 'medium' ? 'vừa' : 'thấp'}
           </small>
           {answer.results.length > 0 ? (
             answer.results.map((result) => (

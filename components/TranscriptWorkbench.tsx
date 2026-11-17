@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type UIEvent } from 'react';
 import { BookOpenText, Link2, LoaderCircle, Sparkles, Subtitles } from 'lucide-react';
 import { detectPlatform, toPlainText, toReadableParagraphs } from '@/domain/transcript';
 import { extractTranscriptInsights, searchTranscript } from '@/domain/insights';
+import { createSemanticSearchIndex } from '@/domain/semantic-search';
 import {
   answerTranscriptQuestion,
   buildTranscriptChapters,
@@ -13,9 +14,11 @@ import {
 import { TranscriptFeedback } from './TranscriptFeedback';
 import { TranscriptKnowledgeCard } from './TranscriptKnowledgeCard';
 import { TranscriptReader } from './TranscriptReader';
+import { TranscriptSavedPanel } from './TranscriptSavedPanel';
 import { useClipboard } from './hooks/useClipboard';
 import { progressStages, useTranscriptExtraction } from './hooks/useTranscriptExtraction';
 import type { ViewMode } from './transcript-workbench-types';
+import { useDebouncedValue } from './hooks/useDebouncedValue';
 
 const downloadText = (content: string, filename: string, mime: string) => {
   const blob = new Blob([content], { type: `${mime};charset=utf-8` });
@@ -53,6 +56,7 @@ export const TranscriptWorkbench = () => {
   const { copied, copyText } = useClipboard();
   const [viewMode, setViewMode] = useState<ViewMode>('read');
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 180);
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const [activeSegmentId, setActiveSegmentId] = useState<number | null>(null);
   const segmentRefs = useRef<Record<number, HTMLDivElement | null>>({});
@@ -60,6 +64,7 @@ export const TranscriptWorkbench = () => {
   const [notes, setNotes] = useState<Record<number, string>>({});
   const [noteDraft, setNoteDraft] = useState('');
   const [question, setQuestion] = useState('');
+  const debouncedQuestion = useDebouncedValue(question, 220);
   const storageHydratedRef = useRef(false);
 
   const platform = useMemo(() => detectPlatform(url), [url]);
@@ -76,13 +81,25 @@ export const TranscriptWorkbench = () => {
   const actionItems = useMemo(() => (document ? extractActionItems(document.segments) : []), [document]);
   const answer = useMemo(
     () =>
-      document ? answerTranscriptQuestion(document.segments, question) : { confidence: 'low' as const, results: [] },
-    [document, question],
+      document
+        ? answerTranscriptQuestion(document.segments, debouncedQuestion)
+        : { confidence: 'low' as const, results: [] },
+    [document, debouncedQuestion],
   );
   const searchResults = useMemo(
-    () => (document ? searchTranscript(document.segments, searchQuery) : []),
-    [document, searchQuery],
+    () => (document ? searchTranscript(document.segments, debouncedSearchQuery) : []),
+    [document, debouncedSearchQuery],
   );
+  const semanticSearchIndex = useMemo(
+    () => (document ? createSemanticSearchIndex(document.segments) : null),
+    [document],
+  );
+  const semanticResults = useMemo(
+    () => (semanticSearchIndex ? semanticSearchIndex.search(debouncedSearchQuery) : []),
+    [semanticSearchIndex, debouncedSearchQuery],
+  );
+  const usesSemanticFallback = searchResults.length === 0 && semanticResults.length > 0;
+  const visibleSearchResults = usesSemanticFallback ? semanticResults : searchResults;
   const wordCount = useMemo(
     () => paragraphs.reduce((count, paragraph) => count + (paragraph.match(/\S+/g)?.length || 0), 0),
     [paragraphs],
@@ -95,11 +112,11 @@ export const TranscriptWorkbench = () => {
 
   useEffect(() => {
     setActiveSearchIndex(0);
-    if (searchQuery.trim() && searchResults.length > 0) {
+    if (debouncedSearchQuery.trim() && visibleSearchResults.length > 0) {
       setViewMode('raw');
-      setActiveSegmentId(searchResults[0].segmentId);
+      setActiveSegmentId(visibleSearchResults[0].segmentId);
     }
-  }, [searchQuery, searchResults]);
+  }, [debouncedSearchQuery, visibleSearchResults]);
 
   useEffect(() => {
     if (!document) return;
@@ -137,7 +154,7 @@ export const TranscriptWorkbench = () => {
       setReadingProgress(scrollableHeight <= 0 ? 100 : 0);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [document, viewMode]);
+  }, [document]);
 
   useEffect(() => {
     if (!document) return;
@@ -204,6 +221,15 @@ export const TranscriptWorkbench = () => {
     setNotice('Đã lưu ghi chú trên thiết bị này.');
   };
 
+  const removeNote = (segmentId: number) => {
+    setNotes((current) => {
+      const next = { ...current };
+      delete next[segmentId];
+      return next;
+    });
+    setNotice('Đã xóa ghi chú trên thiết bị này.');
+  };
+
   const exportKnowledge = () => {
     if (!document) return;
     const lines = [
@@ -222,15 +248,43 @@ export const TranscriptWorkbench = () => {
       '',
       '## Highlights',
       ...insights.highlights.map((item) => `- [${formatTimestamp(item.offset)}] ${item.text}`),
+      '',
+      '## Keywords',
+      ...insights.keywords.map((keyword) => `- ${keyword.term} (${keyword.count})`),
+      '',
+      '## Bookmarks',
+      ...(bookmarkedSegments.length
+        ? bookmarkedSegments.flatMap((segmentId) => {
+            const item = document.segments[segmentId];
+            return item ? [`- [${formatTimestamp(item.offset)}] ${item.text}`] : [];
+          })
+        : ['- Không có bookmark']),
+      '',
+      '## Notes',
+      ...(Object.entries(notes).length
+        ? Object.entries(notes).map(
+            ([segmentId, text]) => `- [${formatTimestamp(document.segments[Number(segmentId)]?.offset ?? 0)}] ${text}`,
+          )
+        : ['- Không có ghi chú']),
+      '',
+      '## Q&A',
+      ...(question.trim()
+        ? [
+            `Câu hỏi: ${question.trim()}`,
+            ...(answer.results.length
+              ? answer.results.map((result) => `- [${formatTimestamp(result.offset)}] ${result.text}`)
+              : ['- Không tìm thấy đoạn liên quan']),
+          ]
+        : ['- Chưa đặt câu hỏi']),
     ];
     downloadText(lines.join('\n'), `${base}-notes.md`, 'text/markdown');
   };
 
   const moveSearch = (direction: 1 | -1) => {
-    if (searchResults.length === 0) return;
-    const nextIndex = (activeSearchIndex + direction + searchResults.length) % searchResults.length;
+    if (visibleSearchResults.length === 0) return;
+    const nextIndex = (activeSearchIndex + direction + visibleSearchResults.length) % visibleSearchResults.length;
     setActiveSearchIndex(nextIndex);
-    scrollToSegment(searchResults[nextIndex].segmentId);
+    scrollToSegment(visibleSearchResults[nextIndex].segmentId);
   };
 
   const copy = async () => {
@@ -363,6 +417,14 @@ export const TranscriptWorkbench = () => {
               onExport={exportKnowledge}
               formatTimestamp={formatTimestamp}
             />
+            <TranscriptSavedPanel
+              document={document}
+              bookmarkedSegments={bookmarkedSegments}
+              notes={notes}
+              onSegmentClick={scrollToSegment}
+              onToggleBookmark={toggleBookmark}
+              onRemoveNote={removeNote}
+            />
           </aside>
 
           <TranscriptReader
@@ -376,8 +438,10 @@ export const TranscriptWorkbench = () => {
             onCopy={copy}
             onDownload={downloadText}
             searchQuery={searchQuery}
+            searchHighlightQuery={debouncedSearchQuery}
             onSearchQueryChange={setSearchQuery}
-            searchResults={searchResults}
+            searchResults={visibleSearchResults}
+            semanticSearch={usesSemanticFallback}
             onMoveSearch={moveSearch}
             readerBodyRef={readerBodyRef}
             onReaderScroll={handleReaderScroll}
