@@ -25,13 +25,13 @@ jobs:
       matrix:
         include:
           - name: macOS Apple Silicon
-            os: macos-14
+            os: macos-15
             target: aarch64-apple-darwin
             node_archive: node-v22.14.0-darwin-arm64.tar.gz
             node_dir: node-v22.14.0-darwin-arm64
             ytdlp_asset: yt-dlp_macos
           - name: macOS Intel
-            os: macos-13
+            os: macos-15-intel
             target: x86_64-apple-darwin
             node_archive: node-v22.14.0-darwin-x64.tar.gz
             node_dir: node-v22.14.0-darwin-x64

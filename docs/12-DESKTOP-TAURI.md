@@ -24,7 +24,7 @@ npm run tauri:build
 
 ## Release bằng GitHub Actions
 
-Workflow [desktop-release.yml](../.github/workflows/desktop-release.yml) build macOS Apple Silicon, macOS Intel và Windows 64-bit.
+Workflow [desktop-release.yml](../.github/workflows/desktop-release.yml) build macOS Apple Silicon trên `macos-15`, macOS Intel trên `macos-15-intel` và Windows 64-bit. Không dùng `macos-14` vì label này có thể bị GitHub map sang cấu hình arm64 không khả dụng với một số repository/account.
 
 ```bash
 git tag v0.1.0
