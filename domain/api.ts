@@ -5,6 +5,8 @@ export type TranscriptApiErrorCode =
   | 'PROVIDER_NOT_READY'
   | 'TRANSCRIPT_NOT_FOUND'
   | 'YOUTUBE_RATE_LIMITED'
+  | 'YOUTUBE_TIMEOUT'
+  | 'WORKER_RATE_LIMITED'
   | 'VIDEO_UNAVAILABLE'
   | 'INVALID_LANGUAGE'
   | 'WORKER_UNAVAILABLE'
@@ -80,6 +82,11 @@ export const presentTranscriptError = (
       message: 'Hãy cấu hình worker riêng hoặc chờ một lúc rồi thử lại.',
       retryable: true,
     },
+    YOUTUBE_TIMEOUT: {
+      title: 'YouTube phản hồi quá lâu',
+      message: 'Không nhận được transcript trong thời gian cho phép. Hãy thử lại hoặc dùng worker riêng.',
+      retryable: true,
+    },
     VIDEO_UNAVAILABLE: {
       title: 'Video không khả dụng',
       message: 'Video có thể đã bị gỡ, giới hạn quyền xem hoặc không còn public.',
@@ -99,6 +106,11 @@ export const presentTranscriptError = (
       title: 'Worker chưa được xác thực',
       message: 'Token giữa Vercel và worker không khớp. Hãy kiểm tra cấu hình môi trường.',
       retryable: false,
+    },
+    WORKER_RATE_LIMITED: {
+      title: 'Worker đang giới hạn yêu cầu',
+      message: 'Có quá nhiều yêu cầu trong thời gian ngắn. Hãy đợi một lát rồi thử lại.',
+      retryable: true,
     },
     VIDEO_TOO_LONG: {
       title: 'Video quá dài',

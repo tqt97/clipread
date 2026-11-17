@@ -14,7 +14,12 @@ import { cleanSegmentText, detectPlatform, type TranscriptDocument } from '@/dom
 import type { TranscriptProvider } from './transcript-provider';
 
 export type YouTubeProviderErrorCode =
-  'NO_TRANSCRIPT' | 'YOUTUBE_RATE_LIMITED' | 'VIDEO_UNAVAILABLE' | 'INVALID_LANGUAGE' | 'INVALID_URL';
+  | 'NO_TRANSCRIPT'
+  | 'YOUTUBE_RATE_LIMITED'
+  | 'YOUTUBE_TIMEOUT'
+  | 'VIDEO_UNAVAILABLE'
+  | 'INVALID_LANGUAGE'
+  | 'INVALID_URL';
 
 export class YouTubeProviderError extends Error {
   constructor(
@@ -27,23 +32,35 @@ export class YouTubeProviderError extends Error {
 }
 
 const transcriptCache = new InMemoryCache(15 * 60 * 1000);
+const TRANSCRIPT_TIMEOUT_MS = 25_000;
 
 export class YouTubeTranscriptProvider implements TranscriptProvider {
+  constructor(
+    private readonly fetcher: typeof fetchTranscript = fetchTranscript,
+    private readonly timeoutMs = TRANSCRIPT_TIMEOUT_MS,
+  ) {}
+
   supports(url: string): boolean {
     return detectPlatform(url) === 'youtube';
   }
 
   async getTranscript(url: string, language?: string): Promise<TranscriptDocument> {
     let result: TranscriptResult;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
-      result = (await fetchTranscript(url, {
+      result = (await this.fetcher(url, {
         ...(language && language !== 'auto' ? { lang: language } : {}),
         cache: transcriptCache,
         cacheTTL: 15 * 60 * 1000,
         retries: 0,
         videoDetails: true,
+        signal: controller.signal,
       })) as TranscriptResult;
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new YouTubeProviderError('YOUTUBE_TIMEOUT', 'YouTube phản hồi quá lâu.', { cause: error });
+      }
       if (error instanceof YoutubeTranscriptTooManyRequestError) {
         throw new YouTubeProviderError('YOUTUBE_RATE_LIMITED', 'YouTube đang giới hạn request từ máy chủ Vercel.', {
           cause: error,
@@ -68,6 +85,8 @@ export class YouTubeTranscriptProvider implements TranscriptProvider {
         throw new YouTubeProviderError('INVALID_URL', 'URL YouTube không hợp lệ.', { cause: error });
       }
       throw error;
+    } finally {
+      clearTimeout(timeout);
     }
 
     const segments = result.segments

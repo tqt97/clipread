@@ -61,16 +61,25 @@ export async function POST(request: Request) {
     if (error instanceof TranscriptionWorkerError) {
       const isQueueFull = error.code === 'QUEUE_FULL' || error.status === 429;
       const isUnauthorized = error.status === 401;
+      const isRateLimited = error.code === 'RATE_LIMITED';
       return NextResponse.json(
         apiError(
-          isQueueFull ? 'QUEUE_FULL' : isUnauthorized ? 'WORKER_UNAUTHORIZED' : 'WORKER_UNAVAILABLE',
-          isQueueFull
-            ? 'Worker đang quá tải. Hãy thử lại sau ít phút.'
-            : isUnauthorized
-              ? 'Worker transcription từ chối xác thực. Hãy kiểm tra token cấu hình.'
-              : 'Worker transcription hiện không khả dụng.',
+          isRateLimited
+            ? 'WORKER_RATE_LIMITED'
+            : isQueueFull
+              ? 'QUEUE_FULL'
+              : isUnauthorized
+                ? 'WORKER_UNAUTHORIZED'
+                : 'WORKER_UNAVAILABLE',
+          isRateLimited
+            ? 'Có quá nhiều yêu cầu trong thời gian ngắn. Hãy đợi một lát rồi thử lại.'
+            : isQueueFull
+              ? 'Worker đang quá tải. Hãy thử lại sau ít phút.'
+              : isUnauthorized
+                ? 'Worker transcription từ chối xác thực. Hãy kiểm tra token cấu hình.'
+                : 'Worker transcription hiện không khả dụng.',
         ),
-        { status: isQueueFull ? 429 : isUnauthorized ? 502 : 503 },
+        { status: isRateLimited || isQueueFull ? 429 : isUnauthorized ? 502 : 503 },
       );
     }
     if (
@@ -85,16 +94,25 @@ export async function POST(request: Request) {
           if (workerError instanceof TranscriptionWorkerError) {
             const isQueueFull = workerError.code === 'QUEUE_FULL' || workerError.status === 429;
             const isUnauthorized = workerError.status === 401;
+            const isRateLimited = workerError.code === 'RATE_LIMITED';
             return NextResponse.json(
               apiError(
-                isQueueFull ? 'QUEUE_FULL' : isUnauthorized ? 'WORKER_UNAUTHORIZED' : 'WORKER_UNAVAILABLE',
-                isQueueFull
-                  ? 'Worker đang quá tải. Hãy thử lại sau ít phút.'
-                  : isUnauthorized
-                    ? 'Worker transcription từ chối xác thực. Hãy kiểm tra token cấu hình.'
-                    : 'Không thể khởi động worker transcription lúc này.',
+                isRateLimited
+                  ? 'WORKER_RATE_LIMITED'
+                  : isQueueFull
+                    ? 'QUEUE_FULL'
+                    : isUnauthorized
+                      ? 'WORKER_UNAUTHORIZED'
+                      : 'WORKER_UNAVAILABLE',
+                isRateLimited
+                  ? 'Có quá nhiều yêu cầu trong thời gian ngắn. Hãy đợi một lát rồi thử lại.'
+                  : isQueueFull
+                    ? 'Worker đang quá tải. Hãy thử lại sau ít phút.'
+                    : isUnauthorized
+                      ? 'Worker transcription từ chối xác thực. Hãy kiểm tra token cấu hình.'
+                      : 'Không thể khởi động worker transcription lúc này.',
               ),
-              { status: isQueueFull ? 429 : isUnauthorized ? 502 : 502 },
+              { status: isRateLimited || isQueueFull ? 429 : 502 },
             );
           }
           return NextResponse.json(
@@ -119,6 +137,13 @@ export async function POST(request: Request) {
           'Video này không có caption/subtitle khả dụng. MVP chưa chạy speech-to-text từ audio.',
         ),
         { status: 422 },
+      );
+    }
+
+    if (error instanceof YouTubeProviderError && error.code === 'YOUTUBE_TIMEOUT') {
+      return NextResponse.json(
+        apiError('YOUTUBE_TIMEOUT', 'YouTube phản hồi quá lâu. Hãy thử lại hoặc dùng worker riêng.'),
+        { status: 504 },
       );
     }
 

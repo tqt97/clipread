@@ -18,6 +18,22 @@ test('presentTranscriptError explains a full worker queue', () => {
   });
 });
 
+test('presentTranscriptError explains a YouTube timeout', () => {
+  assert.deepEqual(presentTranscriptError('YOUTUBE_TIMEOUT'), {
+    title: 'YouTube phản hồi quá lâu',
+    message: 'Không nhận được transcript trong thời gian cho phép. Hãy thử lại hoặc dùng worker riêng.',
+    retryable: true,
+  });
+});
+
+test('presentTranscriptError explains worker rate limiting', () => {
+  assert.deepEqual(presentTranscriptError('WORKER_RATE_LIMITED'), {
+    title: 'Worker đang giới hạn yêu cầu',
+    message: 'Có quá nhiều yêu cầu trong thời gian ngắn. Hãy đợi một lát rồi thử lại.',
+    retryable: true,
+  });
+});
+
 test('presentTranscriptError handles network and timeout separately', () => {
   assert.equal(presentTranscriptError(undefined, 'network').retryable, true);
   assert.match(presentTranscriptError(undefined, 'timeout').message, /video ngắn hơn/);
