@@ -8,13 +8,16 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "format:check": "prettier --check \"app/**/*.{ts,tsx,css}\" \"components/**/*.{ts,tsx}\" \"domain/**/*.ts\" \"services/**/*.ts\" \"*.{mjs,json}\"",
+    "format:check": "prettier --check \"app/**/*.{ts,tsx,css}\" \"components/**/*.{ts,tsx}\" \"domain/**/*.ts\" \"services/**/*.ts\" \"scripts/**/*.ts\" \"*.{mjs,json}\"",
     "test:worker": "python3 -m unittest discover -s worker -p 'test_*.py'",
-    "test:domain": "tsx --test domain/api.test.ts domain/insights.test.ts domain/knowledge.test.ts",
+    "test:domain": "tsx --test domain/api.test.ts domain/insights.test.ts domain/knowledge.test.ts domain/semantic-search.test.ts",
+    "test:provider": "tsx --test services/youtube-transcript-provider.test.ts",
     "test:e2e": "playwright test",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test:domain && npm run test:worker && npm run build"
+    "benchmark:transcript": "tsx scripts/benchmark-transcript.ts",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test:domain && npm run test:provider && npm run test:worker && npm run build"
   },
   "dependencies": {
+    "@tanstack/react-virtual": "^3.14.26",
     "lucide-react": "^0.468.0",
     "next": "16.4.6",
     "react": "19.2.0",
