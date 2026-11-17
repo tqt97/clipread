@@ -20,7 +20,7 @@ npm run desktop:validate
 npm run tauri:build
 ```
 
-`desktop:runtime` tự tải Node/yt-dlp, lấy FFmpeg, tạo virtualenv Python, cài Whisper/PyInstaller, build worker và chuẩn bị model. Máy người dùng cuối không cần các tool trên; các tool chỉ cần ở máy build hoặc GitHub Actions.
+`desktop:runtime` tự tải Node/yt-dlp, lấy FFmpeg, tạo virtualenv Python, cài Whisper/PyInstaller, build worker và chuẩn bị model. Build worker yêu cầu Python 3.11 hoặc 3.12; Python 3.13+ bị từ chối vì bộ wheel `numba/llvmlite` dùng cho macOS Intel không ổn định. Máy người dùng cuối không cần các tool trên; các tool chỉ cần ở máy build hoặc GitHub Actions.
 
 ## Release bằng GitHub Actions
 

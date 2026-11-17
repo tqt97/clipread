@@ -10,6 +10,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const runtime = path.join(root, 'desktop', 'bundle', 'runtime');
 const temp = path.join(os.tmpdir(), 'clipread-desktop-runtime');
 const nodeVersion = process.env.NODE_RUNTIME_VERSION || '22.14.0';
+const workerBuildVersion = 'worker-v2-pinned-whisper-no-console';
 
 const run = (command, args, options = {}) => execFileSync(command, args, { stdio: 'inherit', ...options });
 const exists = async (file) => {
@@ -108,7 +109,29 @@ const prepareFfmpeg = async () => {
   throw new Error(`Không hỗ trợ tự động chuẩn bị FFmpeg trên ${process.platform}.`);
 };
 
-const pythonCommand = () => process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+const pythonCandidates = () => {
+  if (process.env.PYTHON) return [process.env.PYTHON];
+  return process.platform === 'win32' ? ['py', 'python'] : ['python3.12', 'python3.11', 'python3', 'python'];
+};
+
+const supportedPythonCommand = () => {
+  for (const command of pythonCandidates()) {
+    try {
+      const version = execFileSync(
+        command,
+        ['-c', 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")'],
+        {
+          encoding: 'utf8',
+        },
+      ).trim();
+      const [major, minor] = version.split('.').map(Number);
+      if (major === 3 && minor >= 9 && minor < 13) return command;
+    } catch {
+      // Try the next Python command available on PATH.
+    }
+  }
+  throw new Error('Desktop worker cần Python 3.11 hoặc 3.12. Python 3.13+ không có wheel ổn định cho macOS Intel.');
+};
 const venvPython = () =>
   process.platform === 'win32'
     ? path.join(root, 'worker', '.venv-desktop', 'Scripts', 'python.exe')
@@ -117,8 +140,9 @@ const venvPython = () =>
 const prepareWorker = async () => {
   const executable = process.platform === 'win32' ? 'clipread-worker.exe' : 'clipread-worker';
   const target = path.join(runtime, 'clipread-worker', executable);
-  if (await exists(target)) return;
-  const basePython = pythonCommand();
+  const marker = path.join(runtime, 'clipread-worker', '.build-version');
+  if ((await exists(target)) && (await fs.readFile(marker, 'utf8').catch(() => '')) === workerBuildVersion) return;
+  const basePython = supportedPythonCommand();
   const venv = path.join(root, 'worker', '.venv-desktop');
   if (!(await exists(venvPython()))) run(basePython, ['-m', 'venv', venv]);
   run(venvPython(), ['-m', 'pip', 'install', '--upgrade', 'pip']);
@@ -147,6 +171,7 @@ const prepareWorker = async () => {
   );
   await fs.rm(path.join(runtime, 'clipread-worker'), { recursive: true, force: true });
   await fs.cp(path.join(root, 'dist', 'clipread-worker'), path.join(runtime, 'clipread-worker'), { recursive: true });
+  await fs.writeFile(marker, workerBuildVersion);
 };
 
 try {

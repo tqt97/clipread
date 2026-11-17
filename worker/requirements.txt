@@ -1,2 +1,4 @@
-openai-whisper
-yt-dlp
+openai-whisper==20250625
+numba==0.60.0
+llvmlite==0.43.0
+yt-dlp==2026.10.26

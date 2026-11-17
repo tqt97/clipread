@@ -14,6 +14,7 @@ concurrency:
 
 env:
   NODE_RUNTIME_VERSION: '22.14.0'
+  PYTHONUTF8: '1'
 
 jobs:
   build:
@@ -84,16 +85,6 @@ jobs:
             cp "$(brew --prefix ffmpeg)/bin/ffmpeg" desktop/bundle/runtime/bin/ffmpeg
             chmod +x desktop/bundle/runtime/node desktop/bundle/runtime/bin/yt-dlp desktop/bundle/runtime/bin/ffmpeg
           fi
-      - name: Install Python dependencies and build worker
-        shell: bash
-        run: |
-          set -euo pipefail
-          python -m pip install --upgrade pip
-          python -m pip install -r worker/requirements.txt pyinstaller
-          python scripts/ensure-whisper-model.py
-          python -m PyInstaller --noconfirm --clean --onedir --name clipread-worker --paths . --collect-all whisper --collect-all tiktoken --noconsole worker/entrypoint.py
-          rm -rf desktop/bundle/runtime/clipread-worker
-          cp -R dist/clipread-worker desktop/bundle/runtime/clipread-worker
       - name: Install JavaScript dependencies
         run: npm ci
       - name: Generate complete Tauri icons
