@@ -15,6 +15,14 @@ MODEL_LOCK = threading.Lock()
 WHISPER_MODEL_INSTANCE = None
 
 
+def whisper_model_source(model_name):
+    """Ưu tiên model đã bundle để desktop không tải mạng lúc chạy."""
+    import os
+
+    bundled_path = os.environ.get("WHISPER_MODEL_PATH", "").strip()
+    return bundled_path or model_name
+
+
 def run_command(args, should_cancel=None, deadline=None):
     process = None
     try:
@@ -51,7 +59,7 @@ def get_whisper_model(model_name):
     with MODEL_LOCK:
         if WHISPER_MODEL_INSTANCE is None:
             import whisper
-            WHISPER_MODEL_INSTANCE = whisper.load_model(model_name)
+            WHISPER_MODEL_INSTANCE = whisper.load_model(whisper_model_source(model_name))
     return WHISPER_MODEL_INSTANCE
 
 

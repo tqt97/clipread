@@ -250,7 +250,7 @@ def recover_pending_jobs():
         EXECUTOR.submit(process_job, job["jobId"], job["url"], job["language"], job.get("attempt", 1))
 
 
-if __name__ == "__main__":
+def run_server():
     host = os.getenv("HOST", "127.0.0.1")
     if host not in ("127.0.0.1", "localhost", "::1") and not WORKER_AUTH_TOKEN:
         raise SystemExit("WORKER_AUTH_TOKEN is required when HOST is not local.")
@@ -270,3 +270,7 @@ if __name__ == "__main__":
     finally:
         EXECUTOR.shutdown(wait=True, cancel_futures=False)
         JOB_STORE.close()
+
+
+if __name__ == "__main__":
+    run_server()
