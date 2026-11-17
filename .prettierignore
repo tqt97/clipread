@@ -1,0 +1,7 @@
+node_modules
+.next
+worker/.venv
+worker/__pycache__
+playwright-report
+test-results
+package-lock.json

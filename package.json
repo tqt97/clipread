@@ -7,9 +7,12 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format:check": "prettier --check \"app/**/*.{ts,tsx,css}\" \"components/**/*.{ts,tsx}\" \"domain/**/*.ts\" \"services/**/*.ts\" \"*.{mjs,json}\"",
     "test:worker": "python3 -m unittest discover -s worker -p 'test_*.py'",
     "test:domain": "tsx --test domain/api.test.ts domain/insights.test.ts domain/knowledge.test.ts",
-    "check": "npm run typecheck && npm run test:domain && npm run test:worker && npm run build"
+    "test:e2e": "playwright test",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test:domain && npm run test:worker && npm run build"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -19,11 +22,21 @@
     "youtube-transcript-plus": "2.0.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.65.1",
     "@types/node": "^24.10.0",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^16.5.0",
+    "prettier": "^3.10.1",
     "tsx": "^4.23.15",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.73.0"
   },
   "engines": {
     "node": ">=22"

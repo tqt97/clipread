@@ -17,7 +17,10 @@ test('buildTranscriptChapters splits on meaningful time gaps', () => {
 
 test('extractiveSummary is deterministic and keeps source order', () => {
   const summary = extractiveSummary(segments, [{ term: 'worker', count: 2, segmentIds: [0, 2] }]);
-  assert.deepEqual(summary.map((item) => item.segmentId), [0, 2]);
+  assert.deepEqual(
+    summary.map((item) => item.segmentId),
+    [0, 2],
+  );
 });
 
 test('extractActionItems finds Vietnamese action language', () => {
@@ -27,5 +30,8 @@ test('extractActionItems finds Vietnamese action language', () => {
 test('answerTranscriptQuestion returns grounded transcript matches', () => {
   const answer = answerTranscriptQuestion(segments, 'worker local');
   assert.equal(answer.confidence, 'high');
-  assert.deepEqual(answer.results.map((result) => result.segmentId), [0, 2]);
+  assert.deepEqual(
+    answer.results.map((result) => result.segmentId),
+    [0, 2],
+  );
 });

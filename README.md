@@ -66,7 +66,9 @@ Khi deploy tại `https://clipread-five.vercel.app/`, không dùng URL local ở
 npm run check
 ```
 
-`npm run check` chạy typecheck, domain tests, worker tests và production build.
+`npm run check` chạy typecheck, lint, format check, domain tests, worker tests và production build.
+
+`npm run test:e2e` chạy Playwright trên production build local, dùng API fixture để kiểm tra flow UI mà không phụ thuộc YouTube/TikTok/Facebook.
 
 ## Triển khai
 

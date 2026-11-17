@@ -33,7 +33,7 @@ WORKER_AUTH_TOKEN=<cùng random-secret>
 Pull request / push
         ↓
 GitHub Actions CI
-  npm ci → typecheck → worker tests → Next build
+  npm ci → lint → format check → domain/worker tests → Next build → Playwright E2E
         ↓ pass
 main
         ↓
@@ -63,9 +63,13 @@ npm run check
 `npm run check` gồm:
 
 1. `npm run typecheck`;
-2. `npm run test:domain`;
-3. `npm run test:worker`;
-4. `npm run build`.
+2. `npm run lint`;
+3. `npm run format:check`;
+4. `npm run test:domain`;
+5. `npm run test:worker`;
+6. `npm run build`.
+
+Sau `npm run check`, CI cài Chromium bằng Playwright và chạy `E2E_SKIP_BUILD=1 npm run test:e2e` trên production server local, dùng build đã được kiểm tra. E2E dùng API fixture, không gọi URL video public thật.
 
 Không cài `worker/requirements.txt` trong CI mặc định vì test worker hiện là parser/job-store test và không cần tải Whisper model nặng. Khi thêm integration test gọi `yt-dlp`/Whisper, tạo workflow riêng có fixture và timeout rõ ràng.
 
@@ -77,7 +81,7 @@ Không cài `worker/requirements.txt` trong CI mặc định vì test worker hi�
 2. Vercel → `Add New Project` → import repository.
 3. Chọn production branch là `main`.
 4. Vercel tự tạo Preview Deployment cho branch/PR và Production Deployment khi `main` được deploy.
-5. Trong Vercel, bật Deployment Checks hoặc yêu cầu GitHub check `CI / Typecheck, worker tests, build` pass trước khi merge.
+5. Trong Vercel, bật Deployment Checks hoặc yêu cầu GitHub check `CI / Quality, tests, build, E2E` pass trước khi merge.
 
 Nếu dùng cách này, không bật thêm workflow deploy production bên dưới để tránh một commit tạo hai production deployment.
 
@@ -250,7 +254,7 @@ Worker hiện là MVP in-memory: restart sẽ mất job, không có persistence 
 Trên GitHub → `Settings` → `Branches` → branch rule cho `main`:
 
 - Require a pull request before merging;
-- Require status checks: `CI / Typecheck, worker tests, build`;
+- Require status checks: `CI / Quality, tests, build, E2E`;
 - Require branches to be up to date nếu team cần strict merge;
 - Restrict force push;
 - bật conversation resolution nếu dùng code review.

@@ -8,3 +8,5 @@ node_modules
 worker/.venv
 worker/__pycache__
 *.pyc
+playwright-report
+test-results

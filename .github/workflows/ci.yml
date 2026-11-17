@@ -15,9 +15,9 @@ concurrency:
 
 jobs:
   check:
-    name: Typecheck, worker tests, build
+    name: Quality, tests, build, E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,3 +38,9 @@ jobs:
 
       - name: Run project checks
         run: npm run check
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser E2E
+        run: E2E_SKIP_BUILD=1 npm run test:e2e

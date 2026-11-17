@@ -102,7 +102,7 @@ Paste URL
 → copy/export
 ```
 
-Nên dùng Playwright khi UI ổn định.
+Playwright hiện đã được bật tại `e2e/` với API fixture; CI chạy trên production build local và không phụ thuộc upstream video thật.
 
 ## 6. Regression policy
 
@@ -122,6 +122,7 @@ npm run typecheck
 npm run test:domain
 npm run test:worker
 npm run build
+npm run test:e2e
 ```
 
-E2E browser và test runtime với URL public thật vẫn cần bổ sung khi có fixture ổn định.
+E2E browser dùng API fixture để kiểm tra flow UI ổn định; test runtime với URL public thật vẫn cần chạy riêng vì phụ thuộc upstream và rate limit.
