@@ -163,7 +163,7 @@ Web
 
 ### Tasks
 
-- [x] Job model in-memory.
+- [x] SQLite job model, TTL cleanup, recovery sau restart, retry giới hạn và idempotency theo URL/ngôn ngữ.
 - [x] Queue một job chạy và một job chờ.
 - [ ] Worker deployment production.
 - [x] Audio temp storage.

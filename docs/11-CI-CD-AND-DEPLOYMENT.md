@@ -196,7 +196,7 @@ Quick Tunnel có URL thay đổi và phù hợp test, không phù hợp producti
 7. Trỏ `TRANSCRIPTION_WORKER_URL` tới domain HTTPS của worker.
 8. Kiểm tra `/health`, sau đó test TikTok và YouTube từ production.
 
-Worker hiện là in-memory MVP: restart mất job, chỉ chạy một job đồng thời và chưa có auto-scale. Không mở public traffic lớn trước khi thêm queue bền vững, rate limit và monitoring.
+Worker hiện dùng SQLite bền vững, recovery job sau restart, rate limit submit và chỉ chạy một job đồng thời. Chưa có auto-scale, metrics đầy đủ hoặc multi-worker coordination; không mở public traffic lớn trước khi bổ sung các phần này.
 
 ## 5.3. Checklist kiểm tra đúng environment
 
@@ -247,7 +247,9 @@ Khi đặt sau reverse proxy/public network:
 - không ghi token vào access log;
 - kiểm tra `GET /health` trả JSON `{"status":"ok"}`.
 
-Worker hiện là MVP in-memory: restart sẽ mất job, không có persistence và không tự scale. Không dùng cấu hình này cho public traffic lớn nếu chưa thêm queue bền vững, rate limit và ownership cho job.
+Worker hiện có SQLite persistence, recovery sau restart và rate limit cơ bản nhưng chưa tự scale hoặc có ownership/lease giữa nhiều worker. Không dùng cấu hình này cho public traffic lớn nếu chưa bổ sung coordination và monitoring.
+
+Worker cung cấp `GET /metrics` có auth để kiểm tra nhanh số job bắt đầu, hoàn tất, thất bại, retry và request bị rate limit. Đây là metrics tối thiểu, chưa thay thế Prometheus/OpenTelemetry.
 
 ## 7. Branch protection
 

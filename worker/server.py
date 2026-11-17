@@ -6,13 +6,16 @@ import hmac
 import os
 import sys
 import tempfile
+import time
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .captions import caption_candidates, caption_extension, fetch_caption, parse_caption
 from .errors import WorkerError
 from .job_store import JobStore
+from .metrics import Metrics
 from .platforms import platform_for
+from .rate_limiter import RateLimiter
 from .transcriber import run_command, transcribe_audio
 
 YTDLP = os.getenv("YTDLP_BINARY", "yt-dlp")
@@ -21,11 +24,18 @@ WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")
 WORKER_AUTH_TOKEN = os.getenv("WORKER_AUTH_TOKEN", "").strip()
 MAX_VIDEO_DURATION_SECONDS = int(os.getenv("MAX_VIDEO_DURATION_SECONDS", "7200"))
 MAX_CAPTION_BYTES = int(os.getenv("MAX_CAPTION_BYTES", str(5 * 1024 * 1024)))
+MAX_JOB_ATTEMPTS = int(os.getenv("MAX_JOB_ATTEMPTS", "2"))
 JOB_STORE = JobStore(
     ttl_seconds=int(os.getenv("JOB_TTL_SECONDS", "3600")),
     max_jobs=int(os.getenv("MAX_JOBS", "100")),
+    db_path=os.getenv("JOB_DB_PATH", "worker/data/jobs.sqlite3"),
+)
+SUBMISSION_RATE_LIMITER = RateLimiter(
+    limit=int(os.getenv("MAX_SUBMISSIONS_PER_WINDOW", "10")),
+    window_seconds=int(os.getenv("SUBMISSION_WINDOW_SECONDS", "60")),
 )
 EXECUTOR = ThreadPoolExecutor(max_workers=1)
+METRICS = Metrics()
 
 
 def fetch_info(url):
@@ -38,7 +48,16 @@ def fetch_info(url):
         raise WorkerError("INVALID_UPSTREAM_RESPONSE", "Nguồn video trả về dữ liệu không hợp lệ.") from error
 
 
-def process_job(job_id, url, language):
+RETRYABLE_JOB_ERRORS = {
+    "COMMAND_TIMEOUT",
+    "INVALID_UPSTREAM_RESPONSE",
+    "UPSTREAM_COMMAND_FAILED",
+    "UPSTREAM_RATE_LIMITED",
+}
+
+
+def process_job(job_id, url, language, attempt=1):
+    METRICS.increment("jobs_started")
     JOB_STORE.update(job_id, status="running", stage="fetching_metadata")
     try:
         with tempfile.TemporaryDirectory(prefix="clipread-") as temp_dir:
@@ -87,12 +106,22 @@ def process_job(job_id, url, language):
                 "segments": segments,
             }
         JOB_STORE.update(job_id, status="completed", stage="completed", document=document)
+        METRICS.increment("jobs_completed")
     except WorkerError as error:
         print(f"[worker] job failed: {error.code} - {error}", file=sys.stderr)
+        if error.code in RETRYABLE_JOB_ERRORS and attempt < MAX_JOB_ATTEMPTS:
+            METRICS.increment("jobs_retried")
+            retry_delay = min(30, 2 ** attempt)
+            JOB_STORE.update(job_id, status="queued", stage="queued", retryCount=attempt)
+            time.sleep(retry_delay)
+            EXECUTOR.submit(process_job, job_id, url, language, attempt + 1)
+            return
         JOB_STORE.update(job_id, status="failed", error=str(error), code=error.code)
+        METRICS.increment("jobs_failed")
     except Exception as error:
         print(f"[worker] unexpected job failure: {type(error).__name__}: {error}", file=sys.stderr)
         JOB_STORE.update(job_id, status="failed", error="Worker gặp lỗi không mong muốn.", code="WORKER_ERROR")
+        METRICS.increment("jobs_failed")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -120,6 +149,14 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != "/jobs":
             self.send_json({"error": "Not found", "code": "NOT_FOUND"}, 404)
             return
+        client_key = self.client_address[0]
+        if not SUBMISSION_RATE_LIMITER.allow(client_key):
+            METRICS.increment("requests_rate_limited")
+            self.send_json(
+                {"error": "Có quá nhiều yêu cầu trong thời gian ngắn.", "code": "RATE_LIMITED"},
+                429,
+            )
+            return
         try:
             length = int(self.headers.get("Content-Length", "0"))
             if length > 16_384:
@@ -133,8 +170,10 @@ class Handler(BaseHTTPRequestHandler):
                 raise WorkerError("INVALID_REQUEST", "Thiếu URL video.")
             if platform_for(url) == "unknown":
                 raise WorkerError("UNSUPPORTED_PLATFORM", "Nền tảng chưa được worker hỗ trợ.")
-            job = JOB_STORE.create()
-            EXECUTOR.submit(process_job, job["jobId"], url, language)
+            job = JOB_STORE.create(url, language)
+            if job["status"] in ("queued", "running"):
+                METRICS.increment("jobs_submitted")
+                EXECUTOR.submit(process_job, job["jobId"], url, language)
             self.send_json(job, 202)
         except json.JSONDecodeError:
             self.send_json({"error": "Body request phải là JSON hợp lệ.", "code": "INVALID_REQUEST"}, 400)
@@ -148,6 +187,9 @@ class Handler(BaseHTTPRequestHandler):
         if not self.authorized():
             self.send_json({"error": "Worker authentication required.", "code": "UNAUTHORIZED"}, 401)
             return
+        if self.path == "/metrics":
+            self.send_json(METRICS.snapshot())
+            return
         if not self.path.startswith("/jobs/"):
             self.send_json({"error": "Not found", "code": "NOT_FOUND"}, 404)
             return
@@ -158,9 +200,16 @@ class Handler(BaseHTTPRequestHandler):
         return
 
 
+def recover_pending_jobs():
+    for job in JOB_STORE.pending_jobs():
+        JOB_STORE.update(job["jobId"], status="queued", stage="queued")
+        EXECUTOR.submit(process_job, job["jobId"], job["url"], job["language"])
+
+
 if __name__ == "__main__":
     host = os.getenv("HOST", "127.0.0.1")
     if host not in ("127.0.0.1", "localhost", "::1") and not WORKER_AUTH_TOKEN:
         raise SystemExit("WORKER_AUTH_TOKEN is required when HOST is not local.")
     port = int(os.getenv("PORT", "8787"))
+    recover_pending_jobs()
     ThreadingHTTPServer((host, port), Handler).serve_forever()

@@ -23,6 +23,12 @@ curl http://127.0.0.1:8787/health
 
 Kết quả mong đợi: `{"status": "ok", "service": "clipread-worker"}`.
 
+Metrics tối thiểu (cần token nếu worker bật auth):
+
+```bash
+curl -H "Authorization: Bearer $WORKER_AUTH_TOKEN" http://127.0.0.1:8787/metrics
+```
+
 Trong terminal chạy Next.js:
 
 ```bash
@@ -51,8 +57,10 @@ WHISPER_MODEL=small  # tốt hơn nhưng chậm/nặng hơn
 
 ## Giới hạn MVP
 
-- Job lưu trong bộ nhớ; restart worker sẽ mất job.
+- Job state được lưu trong SQLite tại `JOB_DB_PATH` (mặc định `worker/data/jobs.sqlite3`); restart worker có thể khôi phục job đang chờ.
 - Chỉ chạy một job cùng lúc và giới hạn thêm một job đang chờ để không làm máy quá tải.
 - Job hoàn tất/lỗi được dọn sau `JOB_TTL_SECONDS`.
+- Submit cùng URL và ngôn ngữ sẽ dùng lại job đang chạy/đã hoàn tất trong TTL; upstream failure có retry giới hạn bởi `MAX_JOB_ATTEMPTS`.
+- Worker giới hạn số lần submit theo client bằng `MAX_SUBMISSIONS_PER_WINDOW` và `SUBMISSION_WINDOW_SECONDS`.
 - Worker nên chạy local hoặc trong mạng riêng; không expose trực tiếp ra Internet.
 - Chỉ xử lý URL/nội dung mà người dùng có quyền truy cập và sử dụng.

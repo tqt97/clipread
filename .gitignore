@@ -7,6 +7,7 @@ node_modules
 *.tsbuildinfo
 worker/.venv
 worker/__pycache__
+worker/data
 *.pyc
 playwright-report
 test-results

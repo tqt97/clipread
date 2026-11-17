@@ -47,9 +47,10 @@ Chứa interface provider, registry và adapter kết nối upstream. Adapter bi
 Worker được tách theo trách nhiệm để không biến HTTP entry point thành một module monolith:
 
 - `server.py`: HTTP endpoint, auth và điều phối job.
-- `job_store.py`: job in-memory, giới hạn queue và TTL cleanup.
+- `job_store.py`: SQLite-backed job store, giới hạn queue, TTL cleanup và recovery sau restart.
 - `captions.py`: chọn caption, tải caption an toàn và chuẩn hóa VTT/SRT/TTML/JSON.
 - `transcriber.py`: subprocess `yt-dlp`/FFmpeg và model Whisper cache theo process.
+- `metrics.py`, `rate_limiter.py`: metrics tối thiểu và giới hạn submit theo client.
 - `platforms.py`, `errors.py`: allowlist nền tảng và lỗi nội bộ dùng chung.
 
 Chạy từ root repository bằng `python3 -m worker.server` để các import module hoạt động nhất quán giữa local và test.
@@ -93,7 +94,9 @@ Web/API → tạo job → queue → worker → lấy audio tạm
 
 Worker cần timeout, retry, cancellation, cleanup, giới hạn tài nguyên và idempotency riêng.
 
-Baseline hiện đã có worker tối giản tại `worker/`: job in-memory, một job mỗi lần, `yt-dlp`, FFmpeg và Whisper local. Đây là lựa chọn tiết kiệm chi phí cho máy cá nhân; chưa phải hệ thống production nhiều người dùng.
+Các phần timeout, retry giới hạn, cleanup, idempotency URL/ngôn ngữ và SQLite persistence hiện đã có ở mức local MVP; cancellation hiện dừng polling phía client, không hủy process Whisper đang chạy.
+
+Worker hiện đã có SQLite job state, recovery sau restart, rate limit submit và một job mỗi lần, cùng `yt-dlp`, FFmpeg và Whisper local. Đây vẫn là lựa chọn tiết kiệm chi phí cho máy cá nhân; chưa phải hệ thống production auto-scale nhiều worker.
 
 ## 7. Nguyên tắc không phá kiến trúc
 
