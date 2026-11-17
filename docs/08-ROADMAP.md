@@ -30,11 +30,11 @@
 ## v0.4 — Local Understanding (đã có bản deterministic MVP)
 
 - Q&A grounded: trả về các đoạn transcript liên quan, không bịa câu trả lời.
-- Search hiện tại là lexical/accent-insensitive; semantic search thật cần embedding model local và sẽ triển khai sau khi có benchmark.
+- Search hiện tại là lexical/accent-insensitive; khi không có exact match, hệ thống dùng TF-IDF local ranking để gợi ý theo nội dung. Đây là semantic-ranking v1 không dùng API/model, chưa hiểu synonym như embedding search.
 
 ## v0.5 — Transcribe Anything (đã có bản local MVP)
 
-- Background jobs in-memory.
+- Worker job state đã chuyển sang SQLite và có recovery sau restart; chưa có multi-worker auto-scale.
 - Audio extraction local.
 - FFmpeg preprocessing.
 - Whisper local fallback.

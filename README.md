@@ -6,11 +6,11 @@ ClipRead là web app ưu tiên caption: người dùng dán đường dẫn vide
 
 ## Phạm vi MVP
 
-Đã có: URL YouTube công khai có caption, metadata, chế độ bài đọc, chế độ caption kèm timestamp, tìm kiếm và highlight, cụm từ khóa, summary trích xuất ngắn, action items, Q&A grounded, bookmark/notes local, copy, xuất `.md`/`.txt`/`.srt` và export knowledge `.md`. MVP không có tài khoản, cơ sở dữ liệu hay lưu trữ lâu dài.
+Đã có: URL YouTube công khai có caption, metadata, chế độ bài đọc, chế độ caption kèm timestamp, tìm kiếm lexical không dấu, gợi ý theo nội dung local, cụm từ khóa, summary trích xuất ngắn, action items, Q&A grounded, bookmark/notes local, copy, xuất `.md`/`.txt`/`.srt` và export knowledge `.md`. UI transcript dài dùng virtualized rendering.
 
 TikTok và Facebook có pipeline thử nghiệm qua worker local khi `TRANSCRIPTION_WORKER_URL` đã cấu hình. Vì chưa có public URL regression matrix, chưa xem đây là production guarantee. Nếu chưa bật worker, API trả `PROVIDER_NOT_READY`.
 
-Chưa có: abstractive summary, semantic search bằng embedding, thư viện lưu trữ và authentication. Summary/Q&A hiện chỉ dùng transcript làm nguồn, không gọi API AI trả phí. Tải audio và speech-to-text chỉ chạy trong worker local, không chạy trực tiếp trong route Vercel.
+Chưa có: semantic search bằng embedding/model ngôn ngữ, abstractive summary, tài khoản và thư viện đồng bộ cloud. Gợi ý theo nội dung hiện dùng TF-IDF local, không hiểu synonym như embedding model. Summary/Q&A chỉ dùng transcript làm nguồn, không gọi API AI trả phí. Tải audio và speech-to-text chỉ chạy trong worker local, không chạy trực tiếp trong route Vercel.
 
 ## Cấu trúc chính
 
@@ -67,6 +67,8 @@ npm run check
 ```
 
 `npm run check` chạy typecheck, lint, format check, domain tests, worker tests và production build.
+
+`npm run benchmark:transcript` đo lexical search trên 1k/5k/20k segments để kiểm tra regression hiệu năng trước khi thay bằng embedding model.
 
 `npm run test:e2e` chạy Playwright trên production build local, dùng API fixture để kiểm tra flow UI mà không phụ thuộc YouTube/TikTok/Facebook.
 

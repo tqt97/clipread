@@ -120,9 +120,11 @@ Không release nếu chưa pass:
 ```bash
 npm run typecheck
 npm run test:domain
+npm run test:provider
 npm run test:worker
 npm run build
 npm run test:e2e
+npm run benchmark:transcript
 ```
 
 E2E browser dùng API fixture để kiểm tra flow UI ổn định; test runtime với URL public thật vẫn cần chạy riêng vì phụ thuộc upstream và rate limit.

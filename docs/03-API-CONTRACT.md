@@ -69,6 +69,9 @@ Nếu worker chạy remote, Next.js gửi `Authorization: Bearer ...` từ `TRAN
 | 502 | `VIDEO_UNAVAILABLE` | Video bị gỡ, private hoặc không thể truy cập |
 | 502 | `WORKER_UNAVAILABLE` | Không kết nối hoặc worker gặp lỗi |
 | 502 | `WORKER_UNAUTHORIZED` | Token giữa app và worker không khớp |
+| 429 | `QUEUE_FULL` | Worker đã đạt giới hạn job đang chờ/chạy |
+| 429 | `WORKER_RATE_LIMITED` | Worker giới hạn tần suất submit từ client |
+| 504 | `YOUTUBE_TIMEOUT` | YouTube không phản hồi trong thời gian cho phép |
 | 503 | `YOUTUBE_RATE_LIMITED` | YouTube đang giới hạn request |
 | 502 | `UPSTREAM_ERROR` | Provider/upstream thất bại |
 
