@@ -39,21 +39,18 @@ export const detectPlatform = (value: string): SourcePlatform => {
   }
 };
 
-const decodeEntities = (value: string): string => value
-  .replaceAll('&amp;', '&')
-  .replaceAll('&quot;', '"')
-  .replaceAll('&#39;', "'")
-  .replaceAll('&lt;', '<')
-  .replaceAll('&gt;', '>');
+const decodeEntities = (value: string): string =>
+  value
+    .replaceAll('&amp;', '&')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&#39;', "'")
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>');
 
-export const cleanSegmentText = (value: string): string => decodeEntities(value)
-  .replace(/\s+/g, ' ')
-  .trim();
+export const cleanSegmentText = (value: string): string => decodeEntities(value).replace(/\s+/g, ' ').trim();
 
 export const toReadableParagraphs = (segments: TranscriptSegment[]): string[] => {
-  const lines = segments
-    .map((segment) => cleanSegmentText(segment.text))
-    .filter(Boolean);
+  const lines = segments.map((segment) => cleanSegmentText(segment.text)).filter(Boolean);
 
   const paragraphs: string[] = [];
   let current: string[] = [];
@@ -88,13 +85,14 @@ const formatSrtTime = (seconds: number): string => {
   return `${pad(hours)}:${pad(minutes)}:${pad(secs)},${pad(ms, 3)}`;
 };
 
-export const toSrt = (segments: TranscriptSegment[]): string => segments
-  .map((segment, index) => {
-    const start = segment.offset;
-    const end = segment.offset + segment.duration;
-    return `${index + 1}\n${formatSrtTime(start)} --> ${formatSrtTime(end)}\n${cleanSegmentText(segment.text)}`;
-  })
-  .join('\n\n');
+export const toSrt = (segments: TranscriptSegment[]): string =>
+  segments
+    .map((segment, index) => {
+      const start = segment.offset;
+      const end = segment.offset + segment.duration;
+      return `${index + 1}\n${formatSrtTime(start)} --> ${formatSrtTime(end)}\n${cleanSegmentText(segment.text)}`;
+    })
+    .join('\n\n');
 
 export const toMarkdown = (document: TranscriptDocument): string => {
   const paragraphs = toReadableParagraphs(document.segments);
