@@ -1,0 +1,15 @@
+# Keep source and configuration files identical across macOS, Linux, and Windows.
+* text=auto eol=lf
+
+# Never apply text normalization to generated or binary desktop assets.
+*.7z binary
+*.dmg binary
+*.dll binary
+*.exe binary
+*.icns binary
+*.ico binary
+*.msi binary
+*.png binary
+*.so binary
+*.tar.gz binary
+*.zip binary
