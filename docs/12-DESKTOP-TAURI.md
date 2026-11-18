@@ -2,11 +2,13 @@
 
 ## Mục tiêu
 
-ClipRead desktop được đóng gói thành installer cho macOS và Windows. Người dùng cuối chỉ cần cài `.dmg`, `.app`, `.msi` hoặc `.exe`; không cần cài Node.js, Python, FFmpeg, yt-dlp hay Whisper. Windows installer dùng `embedBootstrapper` cho WebView2; installer sẽ xử lý thành phần nền này nếu máy chưa có.
+ClipRead desktop được đóng gói thành installer cho macOS và Windows. Người dùng cuối chỉ cần cài `.dmg`, `.app`, `.msi` hoặc `.exe`, sau đó click app để tự mở browser mặc định; không cần cài Node.js, Python, FFmpeg, yt-dlp hay Whisper. Windows installer dùng `embedBootstrapper` cho WebView2; installer sẽ xử lý thành phần nền này nếu máy chưa có.
 
 ## Kiến trúc runtime
 
 Tauri là vỏ native. Khi mở app, Rust khởi động Next standalone server tại `127.0.0.1:3000` và worker Python tại `127.0.0.1:8787`. Bundle chứa Node runtime, worker PyInstaller, yt-dlp, FFmpeg và model Whisper `base.pt`. Next server nhận token worker do Tauri tạo trong phiên chạy; worker chỉ bind localhost. Bản Windows dùng `windows_subsystem = "windows"`, `CREATE_NO_WINDOW` và PyInstaller `--noconsole`, nên không mở thêm cửa sổ terminal khi người dùng chạy `.exe`.
+
+Mặc định app dùng browser mode và có tray menu `Thoát ClipRead` để dừng runtime. Muốn dùng cửa sổ Tauri native trong môi trường phát triển, chạy app với environment variable `CLIPREAD_NATIVE_WINDOW=1`.
 
 ## Chạy khi phát triển
 

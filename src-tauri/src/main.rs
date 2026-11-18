@@ -11,9 +11,8 @@ use std::{
 };
 
 use tauri::{
-    menu::{Menu, MenuItem},
-    webview::WebviewWindowBuilder,
-    AppHandle, Manager, RunEvent, WebviewUrl, WindowEvent,
+    menu::MenuItem, tray::TrayIconBuilder, webview::WebviewWindowBuilder, AppHandle, Manager,
+    RunEvent, WebviewUrl, WindowEvent,
 };
 
 struct RuntimeChildren(Mutex<Vec<Child>>);
@@ -46,6 +45,30 @@ fn wait_for_server(port: u16) -> bool {
         thread::sleep(Duration::from_millis(250));
     }
     false
+}
+
+fn open_browser(url: &str) -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(target_os = "macos")]
+    let mut command = {
+        let mut value = Command::new("open");
+        value.arg(url);
+        value
+    };
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        let mut value = Command::new("rundll32.exe");
+        value.args(["url.dll,FileProtocolHandler", url]);
+        value
+    };
+    #[cfg(target_os = "linux")]
+    let mut command = {
+        let mut value = Command::new("xdg-open");
+        value.arg(url);
+        value
+    };
+    hide_console_window(&mut command);
+    command.spawn()?;
+    Ok(())
 }
 
 fn start_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
@@ -101,14 +124,20 @@ fn start_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     thread::spawn(move || {
         if !wait_for_server(8787) || !wait_for_server(3000) {
             eprintln!("ClipRead runtime did not start within 30 seconds");
+            stop_runtime(&app_handle);
+            app_handle.exit(1);
             return;
         }
-        let url = "http://127.0.0.1:3000".parse().expect("valid local URL");
-        let _ = WebviewWindowBuilder::new(&app_handle, "main", WebviewUrl::External(url))
-            .title("ClipRead")
-            .inner_size(1280.0, 840.0)
-            .min_inner_size(960.0, 680.0)
-            .build();
+        if std::env::var("CLIPREAD_NATIVE_WINDOW").as_deref() == Ok("1") {
+            let url = "http://127.0.0.1:3000".parse().expect("valid local URL");
+            let _ = WebviewWindowBuilder::new(&app_handle, "main", WebviewUrl::External(url))
+                .title("ClipRead")
+                .inner_size(1280.0, 840.0)
+                .min_inner_size(960.0, 680.0)
+                .build();
+        } else if let Err(error) = open_browser("http://127.0.0.1:3000") {
+            eprintln!("Could not open the default browser: {error}");
+        }
     });
     Ok(())
 }
@@ -128,18 +157,21 @@ fn main() {
     tauri::Builder::default()
         .setup(|app| {
             app.manage(RuntimeChildren(Mutex::new(Vec::new())));
+            let quit = MenuItem::with_id(app, "quit", "Thoát ClipRead", true, None::<&str>)?;
+            let menu = tauri::menu::Menu::with_items(app, &[&quit])?;
+            let mut tray = TrayIconBuilder::new().menu(&menu).tooltip("ClipRead");
+            if let Some(icon) = app.default_window_icon() {
+                tray = tray.icon(icon.clone());
+            }
+            tray.on_menu_event(|app, event| {
+                if event.id() == "quit" {
+                    stop_runtime(app);
+                    app.exit(0);
+                }
+            })
+            .build(app)?;
             start_runtime(app.handle())?;
             Ok(())
-        })
-        .menu(|app| {
-            let quit = MenuItem::with_id(app, "quit", "Thoát", true, None::<&str>)?;
-            Menu::with_items(app, &[&quit])
-        })
-        .on_menu_event(|app, event| {
-            if event.id() == "quit" {
-                stop_runtime(app);
-                app.exit(0);
-            }
         })
         .on_window_event(|window, event| {
             if matches!(event, WindowEvent::CloseRequested { .. }) {

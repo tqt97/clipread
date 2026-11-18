@@ -91,7 +91,7 @@ Xem hướng dẫn CI/CD và deploy đầy đủ tại [docs/11-CI-CD-AND-DEPLOY
 
 ## Desktop app cho macOS và Windows
 
-ClipRead có Tauri shell và GitHub Actions để build installer self-contained. Bản release mang theo Next server, Node runtime, worker Python, yt-dlp, FFmpeg và Whisper model; máy người dùng chỉ cần cài `.dmg` hoặc `.exe`. Xem [hướng dẫn desktop Tauri](docs/12-DESKTOP-TAURI.md).
+ClipRead có Tauri shell và GitHub Actions để build installer self-contained. Bản release mang theo Next server, Node runtime, worker Python, yt-dlp, FFmpeg và Whisper model; máy người dùng chỉ cần cài `.dmg` hoặc `.exe`, sau đó click app để mở browser mặc định. Xem [hướng dẫn desktop Tauri](docs/12-DESKTOP-TAURI.md).
 
 ## Lỗi thường gặp
 
