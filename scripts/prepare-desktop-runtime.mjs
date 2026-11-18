@@ -141,7 +141,13 @@ const prepareWorker = async () => {
   const executable = process.platform === 'win32' ? 'clipread-worker.exe' : 'clipread-worker';
   const target = path.join(runtime, 'clipread-worker', executable);
   const marker = path.join(runtime, 'clipread-worker', '.build-version');
-  if ((await exists(target)) && (await fs.readFile(marker, 'utf8').catch(() => '')) === workerBuildVersion) return;
+  if (await exists(target)) {
+    const markerValue = await fs.readFile(marker, 'utf8').catch(() => '');
+    if (markerValue !== workerBuildVersion) {
+      console.warn('Using existing worker runtime; Python 3.11/3.12 is only required when rebuilding it.');
+    }
+    return;
+  }
   const basePython = supportedPythonCommand();
   const venv = path.join(root, 'worker', '.venv-desktop');
   if (!(await exists(venvPython()))) run(basePython, ['-m', 'venv', venv]);
